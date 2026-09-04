@@ -1,5 +1,10 @@
 # Version history
 
+## 0.1.47
+
+- New waterfall rows now enter at the top and flow downward through the display.
+- Changed the two passband edge lines from green to high-contrast white and increased their thickness to 2.5 pixels.
+
 ## 0.1.46
 
 - Aligned the KiwiSDR WebSocket authentication command with the current official client format.

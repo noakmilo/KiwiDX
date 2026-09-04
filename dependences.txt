@@ -1,4 +1,4 @@
-KiwiDX v0.1.46 - Runtime Requirements
+KiwiDX v0.1.47 - Runtime Requirements
 =====================================
 
 Operating system
@@ -25,10 +25,10 @@ Hardware and connectivity
 
 Files that must be distributed together
 ---------------------------------------
-- KiwiDX_v0.1.46.exe
-- KiwiDX_v0.1.46.dll
-- KiwiDX_v0.1.46.deps.json
-- KiwiDX_v0.1.46.runtimeconfig.json
+- KiwiDX_v0.1.47.exe
+- KiwiDX_v0.1.47.dll
+- KiwiDX_v0.1.47.deps.json
+- KiwiDX_v0.1.47.runtimeconfig.json
 - Microsoft.Web.WebView2.Core.dll
 - Microsoft.Web.WebView2.WinForms.dll
 - The complete runtimes folder generated in Release.
@@ -42,12 +42,12 @@ Files that must be distributed together
 
 Optional file
 -------------
-- KiwiDX_v0.1.46.pdb is only needed for debugging and crash diagnostics.
+- KiwiDX_v0.1.47.pdb is only needed for debugging and crash diagnostics.
 
 Installation
 ------------
 1. Install Microsoft .NET 8 Desktop Runtime if it is not already installed.
 2. Keep all distributed files in the same folder.
-3. Run KiwiDX_v0.1.46.exe.
+3. Run KiwiDX_v0.1.47.exe.
 
 No separate NAudio installation is required. Its libraries are included with KiwiDX.

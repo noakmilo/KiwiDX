@@ -98,7 +98,7 @@ public partial class Form1 : Form
 
     public Form1()
     {
-        Text = "KiwiDX v0.1.46 - DIAL ZOOM";
+        Text = "KiwiDX v0.1.47 - DIAL ZOOM";
         Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
         Width = 1180;
         Height = 760;
@@ -108,7 +108,7 @@ public partial class Form1 : Form
 
         var menuStrip = BuildMenuStrip();
         var top = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Padding = new Padding(8), WrapContents = true, BackColor = Color.FromArgb(35, 42, 48) };
-        top.Controls.Add(new Label { Text = "KiwiDX v0.1.46", AutoSize = true, ForeColor = Color.Gold, Font = new Font(Font, FontStyle.Bold), Padding = new Padding(0, 7, 8, 0) });
+        top.Controls.Add(new Label { Text = "KiwiDX v0.1.47", AutoSize = true, ForeColor = Color.Gold, Font = new Font(Font, FontStyle.Bold), Padding = new Padding(0, 7, 8, 0) });
         startupConfiguration = LoadStartupConfiguration();
         urlBox.Width = 260;
         urlBox.Text = startupConfiguration.ServerUrl;

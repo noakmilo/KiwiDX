@@ -107,8 +107,8 @@ public sealed class WaterfallControl : Control
         receivedLines++;
         lock (sync)
         {
-            Array.Copy(pixels, BitmapWidth, pixels, 0, pixels.Length - BitmapWidth);
-            var row = pixels.Length - BitmapWidth;
+            Array.Copy(pixels, 0, pixels, BitmapWidth, pixels.Length - BitmapWidth);
+            const int row = 0;
             for (var x = 0; x < BitmapWidth; x++)
                 pixels[row + x] = palette[line[(int)((long)x * line.Length / BitmapWidth)]];
             var data = bitmap.LockBits(new Rectangle(0, 0, BitmapWidth, BitmapHeight), ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
@@ -226,7 +226,7 @@ public sealed class WaterfallControl : Control
             var passband = Math.Min(span * 0.45, passbandWidth);
             var passbandLeft = (float)((tunedFrequency - passband / 2 - left) / span * ClientSize.Width);
             var passbandRight = (float)((tunedFrequency + passband / 2 - left) / span * ClientSize.Width);
-            using var passbandPen = new Pen(Color.Lime, 2);
+            using var passbandPen = new Pen(Color.White, 2.5f);
             graphics.DrawLine(passbandPen, passbandLeft, 24, passbandLeft, stripTop);
             graphics.DrawLine(passbandPen, passbandRight, 24, passbandRight, stripTop);
         }

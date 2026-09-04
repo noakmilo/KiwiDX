@@ -6,9 +6,9 @@
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
-    <AssemblyName>KiwiDX_v0.1.46</AssemblyName>
-    <Version>0.1.46</Version>
-    <FileVersion>0.1.46.0</FileVersion>
+    <AssemblyName>KiwiDX_v0.1.47</AssemblyName>
+    <Version>0.1.47</Version>
+    <FileVersion>0.1.47.0</FileVersion>
     <RootNamespace>KiwiDX</RootNamespace>
     <ApplicationIcon>icon.ico</ApplicationIcon>
   </PropertyGroup>
