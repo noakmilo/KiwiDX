@@ -1,0 +1,9 @@
+{
+  "ServerUrl": "http://sdr.hfunderground.com:8076",
+  "FrequencyMHz": 7.1,
+  "ConnectOnStartup": false,
+  "PlayOnStartup": false,
+  "WaterfallMinimumDb": -120,
+  "WaterfallMaximumDb": -50
+}
+

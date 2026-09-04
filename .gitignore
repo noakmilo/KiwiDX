@@ -1,0 +1,23 @@
+bin/
+obj/
+.vs/
+dist/
+*.user
+*.suo
+
+# Local user data
+favorites.json
+bookmarks.json
+startup.json
+
+# Bundled runtime binary (distributed through GitHub Releases)
+ffmpeg.exe
+
+# Recordings and browser data
+Record_*.mp3
+Record_*.mp4
+*.wav
+*.WebView2/
+
+# Local Codex project handoff notes
+codex.md

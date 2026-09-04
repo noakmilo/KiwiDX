@@ -1,0 +1,53 @@
+KiwiDX v0.1.46 - Runtime Requirements
+=====================================
+
+Operating system
+----------------
+- Windows 10 or Windows 11.
+- A 64-bit Windows installation is recommended.
+
+Required runtime
+----------------
+- Microsoft .NET 8 Desktop Runtime (x64).
+- Download: https://dotnet.microsoft.com/download/dotnet/8.0
+- Select ".NET Desktop Runtime" for Windows x64.
+- The .NET SDK is not required to run KiwiDX.
+- Microsoft Edge WebView2 Runtime (required for the receiver map).
+- WebView2 download: https://developer.microsoft.com/microsoft-edge/webview2/
+- Windows Media Foundation MP3 encoder (included with supported Windows 10 and Windows 11 installations).
+- The bundled ffmpeg.exe must remain beside KiwiDX for 480p MP4 waterfall recording.
+
+Hardware and connectivity
+-------------------------
+- A Windows-compatible audio output device.
+- An Internet or local-network connection to a KiwiSDR receiver.
+- Firewall access to the HTTP/HTTPS and WebSocket port used by the selected KiwiSDR server.
+
+Files that must be distributed together
+---------------------------------------
+- KiwiDX_v0.1.46.exe
+- KiwiDX_v0.1.46.dll
+- KiwiDX_v0.1.46.deps.json
+- KiwiDX_v0.1.46.runtimeconfig.json
+- Microsoft.Web.WebView2.Core.dll
+- Microsoft.Web.WebView2.WinForms.dll
+- The complete runtimes folder generated in Release.
+- NAudio.dll
+- NAudio.Asio.dll
+- NAudio.Core.dll
+- NAudio.Midi.dll
+- NAudio.Wasapi.dll
+- NAudio.WinForms.dll
+- NAudio.WinMM.dll
+
+Optional file
+-------------
+- KiwiDX_v0.1.46.pdb is only needed for debugging and crash diagnostics.
+
+Installation
+------------
+1. Install Microsoft .NET 8 Desktop Runtime if it is not already installed.
+2. Keep all distributed files in the same folder.
+3. Run KiwiDX_v0.1.46.exe.
+
+No separate NAudio installation is required. Its libraries are included with KiwiDX.
