@@ -1,4 +1,32 @@
+## v0.1.51 - 2026-09-07
+
+- About includes GitHub and PayPal Donate links with an "Enjoying KiwiDX?" support message.
+- New profiles default to Twente WebSDR, labeled [OFF Kiwi Network]; existing favorites are preserved.
+- Favorites submenu always provides Manage Favorites to manually add and delete receivers, with supported receiver guidance and URL/duplicate validation.
+- Added JSON import/export for Favorites and Bookmarks, with validation and merge semantics (existing bookmark IDs and normalized favorite URLs win).
+- Store user data in %LOCALAPPDATA%\KiwiDX across versions; migrate missing files from beside the executable or an old portable folder selected on first launch.
+- Save changed data atomically and keep the previous file as .bak.
+- Added manual GitHub release version checks under Help; downloads and installation remain user initiated.
+- Added a repeatable self-contained Windows x64 ZIP and Inno Setup installer build with fixed upgrade identity, stable installed executable name, downgrade protection, and preserved user data on uninstall.
+- Move receiver-map WebView2 data into the user profile.
+
 # Version history
+
+## 0.1.49
+
+- Fixed RX clock initialization by recognizing channel announcements on both streams and preserving spaces in receiver time metadata.
+- Added bottom-right Local time (green), RX time (yellow), and UTC (red) clocks with bold seven-segment digits; RX uses receiver-reported local time, with Netherlands daylight-saving support for Twente.
+- Replaced the separate Twente window with a hybrid bridge embedded in the main KiwiDX waterfall area.
+- KiwiDX frequency, mode, bandwidth, audio, volume, and basic waterfall controls now drive the official Twente WebSDR client.
+- Switching to any other server address fully restores the native KiwiSDR connection and display.
+- The University of Twente WebSDR can be added to Favorites manually like any other receiver.
+- The receiver map can be opened while the embedded Twente WebSDR remains connected.
+- Restored the native frequency scale immediately when switching from Twente back to a KiwiSDR.
+
+## 0.1.48
+
+- Added hidden compatibility for the University of Twente WebSDR when its exact server address is entered manually.
+- Opens the receiver's official client inside KiwiDX and carries over the selected frequency and mode without adding the server to defaults or discovery lists.
 
 ## 0.1.47
 

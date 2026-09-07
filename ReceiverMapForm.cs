@@ -38,7 +38,8 @@ public sealed class ReceiverMapForm : Form
     {
         try
         {
-            await webView.EnsureCoreWebView2Async();
+            var environment = await CoreWebView2Environment.CreateAsync(null, UserData.PathFor("Map.WebView2"));
+            await webView.EnsureCoreWebView2Async(environment);
             webView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
             webView.CoreWebView2.Settings.AreDevToolsEnabled = false;
             webView.CoreWebView2.NewWindowRequested += OnNewWindowRequested;

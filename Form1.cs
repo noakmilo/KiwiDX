@@ -13,6 +13,7 @@ public partial class Form1 : Form
     private readonly NumericUpDown bandwidthBox = new();
     private readonly Label statusLabel = new();
     private readonly Label cursorLabel = new();
+    private readonly ReceiverClocks clocks = new() { Dock = DockStyle.Right };
     private readonly Button connectButton = new();
     private readonly Button playButton = new();
     private readonly Button recordButton = new();
@@ -38,7 +39,11 @@ public partial class Form1 : Form
     private readonly RichTextBox serverInfoBox = new();
     private readonly GroupBox consolePanel = new();
     private readonly GroupBox serverInfoPanel = new();
+    private readonly Panel waterfallHost = new() { Dock = DockStyle.Fill, BackColor = Color.Black, Padding = Padding.Empty };
+    private readonly Panel receiverDisplayHost = new() { Dock = DockStyle.Fill, BackColor = Color.Black, Padding = Padding.Empty };
+    private readonly FlowLayoutPanel dialPanel = new();
     private TableLayoutPanel? mainLayout;
+    private Control? navigationBar;
     private bool updatingNavigation;
     private bool selectingDetectedBand;
     private double currentViewSpan = 30_000_000d / (1 << 11);
@@ -51,11 +56,12 @@ public partial class Form1 : Form
     private string currentServerTitle = "KiwiSDR";
     private string currentServerLocation = "Location not reported";
     private string currentServerUrl = "";
-    private readonly string favoritesPath = Path.Combine(AppContext.BaseDirectory, "favorites.json");
-    private readonly string startupPath = Path.Combine(AppContext.BaseDirectory, "startup.json");
-    private readonly string bookmarksPath = Path.Combine(AppContext.BaseDirectory, "bookmarks.json");
+    private readonly string favoritesPath = UserData.PathFor("favorites.json");
+    private readonly string startupPath = UserData.PathFor("startup.json");
+    private readonly string bookmarksPath = UserData.PathFor("bookmarks.json");
     private StartupConfiguration startupConfiguration = new();
     private List<FrequencyBookmark> frequencyBookmarks = new();
+    private TwenteWebSdrControl? twenteWebSdr;
 
     private sealed record BandPreset(string Name, double FrequencyMHz, string Mode, int Bandwidth, int Zoom)
     {
@@ -98,7 +104,7 @@ public partial class Form1 : Form
 
     public Form1()
     {
-        Text = "KiwiDX v0.1.47 - DIAL ZOOM";
+        Text = "KiwiDX v0.1.51 - DIAL ZOOM";
         Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
         Width = 1180;
         Height = 760;
@@ -108,7 +114,7 @@ public partial class Form1 : Form
 
         var menuStrip = BuildMenuStrip();
         var top = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Padding = new Padding(8), WrapContents = true, BackColor = Color.FromArgb(35, 42, 48) };
-        top.Controls.Add(new Label { Text = "KiwiDX v0.1.47", AutoSize = true, ForeColor = Color.Gold, Font = new Font(Font, FontStyle.Bold), Padding = new Padding(0, 7, 8, 0) });
+        top.Controls.Add(new Label { Text = "KiwiDX v0.1.51", AutoSize = true, ForeColor = Color.Gold, Font = new Font(Font, FontStyle.Bold), Padding = new Padding(0, 7, 8, 0) });
         startupConfiguration = LoadStartupConfiguration();
         urlBox.Width = 260;
         urlBox.Text = startupConfiguration.ServerUrl;
@@ -163,9 +169,9 @@ public partial class Form1 : Form
         volumeBar.Value = 75;
         volumeBar.Width = 110;
         volumeBar.TickFrequency = 25;
-        volumeBar.ValueChanged += (_, _) => client.SetVolume(volumeBar.Value / 100f);
+        volumeBar.ValueChanged += (_, _) => { client.SetVolume(volumeBar.Value / 100f); twenteWebSdr?.SetVolume(volumeBar.Value); };
         var centerButton = new Button { Text = "Center", AutoSize = true };
-        centerButton.Click += (_, _) => waterfall.CenterOnTune();
+        centerButton.Click += (_, _) => { if (twenteWebSdr is not null) twenteWebSdr.CenterWaterfall(); else waterfall.CenterOnTune(); };
         bandBox.Width = 175;
         bandBox.DropDownStyle = ComboBoxStyle.DropDownList;
         bandBox.Items.AddRange(Bands.Cast<object>().ToArray());
@@ -193,21 +199,22 @@ public partial class Form1 : Form
         top.Controls.Add(favoriteButton);
         top.Controls.SetChildIndex(favoriteButton, 3);
 
-        var navigation = BuildNavigationBar();
-        var waterfallHost = new Panel { Dock = DockStyle.Fill, BackColor = Color.Black, Padding = Padding.Empty };
-        var dialPanel = new FlowLayoutPanel
-        {
-            Dock = DockStyle.Top, Height = 38, WrapContents = false, AutoScroll = false,
-            FlowDirection = FlowDirection.LeftToRight, Padding = new Padding(6, 4, 0, 3),
-            BackColor = Color.FromArgb(210, 18, 24, 30)
-        };
+        navigationBar = BuildNavigationBar();
+        dialPanel.Dock = DockStyle.Top;
+        dialPanel.Height = 38;
+        dialPanel.WrapContents = false;
+        dialPanel.AutoScroll = false;
+        dialPanel.FlowDirection = FlowDirection.LeftToRight;
+        dialPanel.Padding = new Padding(6, 4, 0, 3);
+        dialPanel.BackColor = Color.FromArgb(210, 18, 24, 30);
         dialPanel.Controls.Add(new Label { Text = "DIAL", AutoSize = true, ForeColor = Color.Gold, Font = new Font(Font, FontStyle.Bold), Padding = new Padding(0, 6, 5, 0) });
         dialPanel.Controls.AddRange(new Control[]
         {
             CreateDialButton("---", -100_000), CreateDialButton("--", -10_000), CreateDialButton("-", -1_000),
             CreateDialButton("+", 1_000), CreateDialButton("++", 10_000), CreateDialButton("+++", 100_000)
         });
-        waterfallHost.Controls.Add(waterfall);
+        receiverDisplayHost.Controls.Add(waterfall);
+        waterfallHost.Controls.Add(receiverDisplayHost);
         waterfallHost.Controls.Add(dialPanel);
 
         waterfall.Dock = DockStyle.Fill;
@@ -225,9 +232,16 @@ public partial class Form1 : Form
         cursorLabel.AutoSize = true;
         cursorLabel.Padding = new Padding(8, 5, 0, 0);
         var bottom = new Panel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(35, 42, 48) };
-        bottom.Controls.Add(statusLabel);
-        bottom.Controls.Add(cursorLabel);
-        cursorLabel.Left = 230;
+        var bottomText = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = Padding.Empty };
+        bottomText.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 55));
+        bottomText.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45));
+        statusLabel.AutoSize = cursorLabel.AutoSize = false;
+        statusLabel.AutoEllipsis = cursorLabel.AutoEllipsis = true;
+        statusLabel.Dock = cursorLabel.Dock = DockStyle.Fill;
+        bottomText.Controls.Add(statusLabel, 0, 0);
+        bottomText.Controls.Add(cursorLabel, 1, 0);
+        bottom.Controls.Add(bottomText);
+        bottom.Controls.Add(clocks);
         consoleBox.Dock = DockStyle.Fill;
         consoleBox.Multiline = true;
         consoleBox.ReadOnly = true;
@@ -267,7 +281,7 @@ public partial class Form1 : Form
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 30));
         layout.Controls.Add(top, 0, 0);
         layout.Controls.Add(waterfallHost, 0, 1);
-        layout.Controls.Add(navigation, 0, 2);
+        layout.Controls.Add(navigationBar, 0, 2);
         layout.Controls.Add(serverInfoPanel, 0, 3);
         layout.Controls.Add(consolePanel, 0, 4);
         layout.Controls.Add(bottom, 0, 5);
@@ -293,6 +307,7 @@ public partial class Form1 : Form
                 statusLabel.Text = status;
                 if (status == "Disconnected" || status.StartsWith("Connection lost", StringComparison.OrdinalIgnoreCase))
                 {
+                    if (twenteWebSdr is null) clocks.SetReceiverTime(null);
                     connectButton.Text = "Connect";
                     ResetAudioButton();
                     ResetRecordingButton();
@@ -303,7 +318,8 @@ public partial class Form1 : Form
         client.Error += (_, error) => { if (!IsDisposed) BeginInvoke(() => MessageBox.Show(this, error, "KiwiSDR", MessageBoxButtons.OK, MessageBoxIcon.Warning)); };
         client.Log += (_, message) => { if (!IsDisposed) BeginInvoke(() => AddLog(message)); };
         client.ServerInfoChanged += (_, info) => { if (!IsDisposed) BeginInvoke(() => SetServerInfo(info)); };
-        FormClosing += async (_, _) => { await CancelWaterfallRecordingAsync(); await client.DisposeAsync(); };
+        client.ReceiverTimeChanged += (_, time) => { if (!IsDisposed) BeginInvoke(() => { if (twenteWebSdr is null) clocks.SetReceiverTime(time); }); };
+        FormClosing += async (_, _) => { DeactivateTwenteWebSdr(); await CancelWaterfallRecordingAsync(); await client.DisposeAsync(); };
         Resize += (_, _) => urlBox.Width = Math.Clamp(ClientSize.Width / 4, 150, 300);
         SyncNavigation(7_100_000, currentViewSpan);
         UpdateOptionalPanels();
@@ -384,8 +400,8 @@ public partial class Form1 : Form
         var zoomButtons = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, FlowDirection = FlowDirection.LeftToRight, Margin = Padding.Empty, Padding = Padding.Empty };
         var zoomOutButton = new Button { Text = "Zoom −", AutoSize = false, Size = new Size(72, 25), Margin = new Padding(0, 1, 3, 0) };
         var zoomInButton = new Button { Text = "Zoom +", AutoSize = false, Size = new Size(72, 25), Margin = new Padding(0, 1, 0, 0) };
-        zoomOutButton.Click += (_, _) => waterfall.ZoomOut();
-        zoomInButton.Click += (_, _) => waterfall.ZoomIn();
+        zoomOutButton.Click += (_, _) => { if (twenteWebSdr is not null) twenteWebSdr.ZoomOut(); else waterfall.ZoomOut(); };
+        zoomInButton.Click += (_, _) => { if (twenteWebSdr is not null) twenteWebSdr.ZoomIn(); else waterfall.ZoomIn(); };
         zoomButtons.Controls.AddRange(new Control[] { zoomOutButton, zoomInButton });
         panel.Controls.Add(zoomButtons, 1, 1);
         panel.SetColumnSpan(zoomButtons, 2);
@@ -473,6 +489,7 @@ public partial class Form1 : Form
         frequencyBox.Text = (frequency / 1_000_000).ToString("0.000000", CultureInfo.InvariantCulture);
         waterfall.SetTunedFrequency(frequency);
         client.SetFrequency(frequency);
+        twenteWebSdr?.SetFrequency(frequency);
     }
 
     private void SelectBand()
@@ -489,6 +506,9 @@ public partial class Form1 : Form
         client.SetMode(band.Mode);
         client.SetBandwidth(band.Bandwidth);
         client.SetWaterfallView(band.Zoom, frequency);
+        twenteWebSdr?.SetFrequency(frequency);
+        twenteWebSdr?.SetMode(band.Mode);
+        twenteWebSdr?.SetBandwidth(band.Bandwidth);
     }
 
     private void AddLog(string message)
@@ -508,6 +528,11 @@ public partial class Form1 : Form
 
     private async Task ToggleConnectionCore()
     {
+        if (twenteWebSdr is not null)
+        {
+            if (IsTwenteWebSdr(urlBox.Text)) { DeactivateTwenteWebSdr(); return; }
+            DeactivateTwenteWebSdr();
+        }
         if (client.IsConnected) { await CancelWaterfallRecordingAsync(); await client.DisconnectAsync(); connectButton.Text = "Connect"; ResetAudioButton(); return; }
         if (!double.TryParse(frequencyBox.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out var mhz)) { MessageBox.Show("Invalid frequency."); return; }
         ResetAudioButton();
@@ -515,6 +540,11 @@ public partial class Form1 : Form
         try
         {
             var frequency = mhz * 1_000_000;
+            if (IsTwenteWebSdr(urlBox.Text))
+            {
+                await ActivateTwenteWebSdrAsync(frequency);
+                return;
+            }
             await client.ConnectAsync(urlBox.Text, frequency, modeBox.Text.ToLowerInvariant(), (int)bandwidthBox.Value);
             PreselectBandForFrequency(frequency);
             waterfall.SetRadioState(frequency, 30_000_000d / (1 << 11), frequency, (int)bandwidthBox.Value);
@@ -529,6 +559,57 @@ public partial class Form1 : Form
             MessageBox.Show(this, GetFriendlyConnectionError(ex), "Receiver unavailable", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
         finally { connectButton.Enabled = true; }
+    }
+
+    private async Task ActivateTwenteWebSdrAsync(double frequencyHz)
+    {
+        twenteWebSdr = new TwenteWebSdrControl(frequencyHz, modeBox.Text, (int)bandwidthBox.Value, volumeBar.Value);
+        twenteWebSdr.StatusChanged += (_, status) => { if (!IsDisposed) BeginInvoke(() => statusLabel.Text = status); };
+        waterfall.Visible = false;
+        receiverDisplayHost.Controls.Add(twenteWebSdr);
+        twenteWebSdr.BringToFront();
+        connectButton.Text = "Disconnect";
+        recordButton.Enabled = false;
+        recordWaterfallCheckBox.Enabled = false;
+        currentServerTitle = "University of Twente WebSDR";
+        currentServerLocation = "Enschede, Netherlands";
+        clocks.ReceiverZone = TimeZoneInfo.FindSystemTimeZoneById("W. Europe Standard Time");
+        clocks.Invalidate();
+        currentServerUrl = "http://websdr.ewi.utwente.nl:8901";
+        serverInfoBox.Text = "University of Twente WebSDR\nEnschede, Netherlands\n\nHybrid mode: KiwiDX controls the receiver's official web client.";
+        UpdateFavoriteButton();
+        statusLabel.Text = "Loading the University of Twente WebSDR...";
+        await twenteWebSdr.InitializeAsync();
+    }
+
+    private void DeactivateTwenteWebSdr()
+    {
+        if (twenteWebSdr is null) return;
+        receiverDisplayHost.Controls.Remove(twenteWebSdr);
+        twenteWebSdr.Dispose();
+        twenteWebSdr = null;
+        clocks.ReceiverZone = null;
+        clocks.SetReceiverTime(null);
+        waterfall.Visible = true;
+        waterfall.BringToFront();
+        receiverDisplayHost.PerformLayout();
+        waterfall.Invalidate(true);
+        connectButton.Text = "Connect";
+        recordButton.Enabled = true;
+        recordWaterfallCheckBox.Enabled = true;
+        ResetAudioButton();
+        currentServerTitle = "KiwiSDR";
+        currentServerLocation = "Location not reported";
+        currentServerUrl = "";
+        serverInfoBox.Text = "Connect to a KiwiSDR to view server information.";
+        statusLabel.Text = "Disconnected";
+    }
+
+    private static bool IsTwenteWebSdr(string input)
+    {
+        if (!Uri.TryCreate(input.Contains("://", StringComparison.Ordinal) ? input : "http://" + input,
+                UriKind.Absolute, out var uri)) return false;
+        return uri.Host.Equals("websdr.ewi.utwente.nl", StringComparison.OrdinalIgnoreCase) && uri.Port == 8901;
     }
 
     private void PreselectBandForFrequency(double frequencyHz)
@@ -555,7 +636,7 @@ public partial class Form1 : Form
 
     private void ToggleAudio()
     {
-        if (!client.IsConnected)
+        if (!client.IsConnected && twenteWebSdr is null)
         {
             statusLabel.Text = "Connect to a KiwiSDR before playing audio.";
             return;
@@ -564,13 +645,13 @@ public partial class Form1 : Form
         audioPlaying = !audioPlaying;
         if (audioPlaying)
         {
-            client.PlayAudio();
+            if (twenteWebSdr is not null) twenteWebSdr.Play(); else client.PlayAudio();
             playButton.Text = "■ Stop";
             playButton.BackColor = Color.FromArgb(170, 45, 45);
         }
         else
         {
-            client.StopAudio();
+            if (twenteWebSdr is not null) twenteWebSdr.Stop(); else client.StopAudio();
             ResetAudioButton();
         }
     }
@@ -741,6 +822,7 @@ public partial class Form1 : Form
         if (!double.TryParse(frequencyBox.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out var mhz)) return;
         var frequency = mhz * 1_000_000;
         client.SetFrequency(frequency);
+        twenteWebSdr?.SetFrequency(frequency);
         waterfall.SetTunedFrequency(frequency);
     }
 
@@ -763,9 +845,17 @@ public partial class Form1 : Form
         var bookmarks = new ToolStripMenuItem("Bookmarks");
         bookmarks.DropDownItems.Add(favoritesMenu);
         bookmarks.DropDownItems.Add(myBookmarksMenu);
+        bookmarks.DropDownItems.Add(new ToolStripSeparator());
+        bookmarks.DropDownItems.Add("Import Favorites...", null, (_, _) => ImportData(false));
+        bookmarks.DropDownItems.Add("Export Favorites...", null, (_, _) => ExportData(false));
+        bookmarks.DropDownItems.Add("Import Bookmarks...", null, (_, _) => ImportData(true));
+        bookmarks.DropDownItems.Add("Export Bookmarks...", null, (_, _) => ExportData(true));
         var settings = new ToolStripMenuItem("Settings");
         settings.DropDownItems.Add("Startup", null, (_, _) => OpenStartupSettings());
         var help = new ToolStripMenuItem("Help");
+        var updates = new ToolStripMenuItem("Check for Updates...");
+        updates.Click += async (_, _) => await CheckForUpdates(updates);
+        help.DropDownItems.Add(updates);
         help.DropDownItems.Add("About", null, (_, _) => new AboutForm().ShowDialog(this));
         menu.Items.AddRange(new ToolStripItem[] { file, bookmarks, settings, help });
         return menu;
@@ -778,7 +868,7 @@ public partial class Form1 : Form
             if (!File.Exists(startupPath))
             {
                 var defaults = new StartupConfiguration();
-                File.WriteAllText(startupPath, JsonSerializer.Serialize(defaults, new JsonSerializerOptions { WriteIndented = true }));
+                UserData.Write(startupPath, defaults);
                 return defaults;
             }
 
@@ -799,7 +889,7 @@ public partial class Form1 : Form
         startupConfiguration = dialog.Configuration;
         try
         {
-            File.WriteAllText(startupPath, JsonSerializer.Serialize(startupConfiguration, new JsonSerializerOptions { WriteIndented = true }));
+            UserData.Write(startupPath, startupConfiguration);
             statusLabel.Text = "Startup settings saved.";
         }
         catch (Exception ex)
@@ -819,7 +909,7 @@ public partial class Form1 : Form
     {
         try
         {
-            if (!File.Exists(favoritesPath)) File.WriteAllText(favoritesPath, "[]");
+            if (!File.Exists(favoritesPath)) UserData.Write(favoritesPath, new[] { new FavoriteServer("Twente WebSDR", "[OFF Kiwi Network]", "http://websdr.ewi.utwente.nl:8901") });
             return JsonSerializer.Deserialize<List<FavoriteServer>>(File.ReadAllText(favoritesPath)) ?? new();
         }
         catch (Exception ex)
@@ -842,7 +932,7 @@ public partial class Form1 : Form
                 bookmark.ServerUrls = currentUrl.Length == 0 ? new List<string>() : new List<string> { currentUrl };
                 migrated = true;
             }
-            if (migrated) File.WriteAllText(bookmarksPath, JsonSerializer.Serialize(loaded, new JsonSerializerOptions { WriteIndented = true }));
+            if (migrated) UserData.Write(bookmarksPath, loaded);
             return loaded;
         }
         catch (Exception ex)
@@ -856,7 +946,7 @@ public partial class Form1 : Form
     {
         try
         {
-            File.WriteAllText(bookmarksPath, JsonSerializer.Serialize(frequencyBookmarks, new JsonSerializerOptions { WriteIndented = true }));
+            UserData.Write(bookmarksPath, frequencyBookmarks);
             return true;
         }
         catch (Exception ex)
@@ -913,6 +1003,7 @@ public partial class Form1 : Form
         frequencyBox.Text = (bookmark.FrequencyHz / 1_000_000d).ToString("0.000000", CultureInfo.InvariantCulture);
         waterfall.SetTunedFrequency(bookmark.FrequencyHz);
         client.SetFrequency(bookmark.FrequencyHz);
+        twenteWebSdr?.SetFrequency(bookmark.FrequencyHz);
         statusLabel.Text = $"Tuned to {bookmark.Name}: {bookmark.FrequencyHz / 1_000:0.000} kHz";
     }
 
@@ -968,7 +1059,7 @@ public partial class Form1 : Form
     {
         try
         {
-            File.WriteAllText(favoritesPath, JsonSerializer.Serialize(favorites, new JsonSerializerOptions { WriteIndented = true }));
+            UserData.Write(favoritesPath, favorites);
             return true;
         }
         catch (Exception ex)
@@ -985,8 +1076,6 @@ public partial class Form1 : Form
         if (favorites.Count == 0)
         {
             favoritesMenu.DropDownItems.Add(new ToolStripMenuItem("No favorites yet") { Enabled = false });
-            UpdateFavoriteButton();
-            return;
         }
 
         foreach (var favorite in favorites)
@@ -995,6 +1084,13 @@ public partial class Form1 : Form
             item.Click += async (_, _) => await ConnectToFavorite((FavoriteServer)item.Tag!);
             favoritesMenu.DropDownItems.Add(item);
         }
+        favoritesMenu.DropDownItems.Add(new ToolStripSeparator());
+        favoritesMenu.DropDownItems.Add("Manage Favorites...", null, (_, _) =>
+        {
+            using var manager = new ManageFavoritesForm(LoadFavorites(), SaveFavorites);
+            manager.ShowDialog(this);
+            RefreshFavoritesMenu();
+        });
         UpdateFavoriteButton();
     }
 
@@ -1025,6 +1121,7 @@ public partial class Form1 : Form
             client.StopAudio();
             ResetAudioButton();
             await CancelWaterfallRecordingAsync();
+            DeactivateTwenteWebSdr();
             await client.DisconnectAsync();
             urlBox.Text = serverUrl.Trim().TrimEnd('/');
             connectButton.Text = "Connect";
@@ -1037,6 +1134,6 @@ public partial class Form1 : Form
         }
     }
 
-    private void SendMode() => client.SetMode(modeBox.Text.ToLowerInvariant());
-    private void SendBandwidth() { waterfall.SetPassbandWidth((int)bandwidthBox.Value); client.SetBandwidth((int)bandwidthBox.Value); }
+    private void SendMode() { client.SetMode(modeBox.Text.ToLowerInvariant()); twenteWebSdr?.SetMode(modeBox.Text); }
+    private void SendBandwidth() { waterfall.SetPassbandWidth((int)bandwidthBox.Value); client.SetBandwidth((int)bandwidthBox.Value); twenteWebSdr?.SetBandwidth((int)bandwidthBox.Value); }
 }

@@ -1,4 +1,4 @@
-KiwiDX v0.1.47 - Runtime Requirements
+KiwiDX v0.1.51 - Runtime Requirements
 =====================================
 
 Operating system
@@ -8,11 +8,12 @@ Operating system
 
 Required runtime
 ----------------
-- Microsoft .NET 8 Desktop Runtime (x64).
+- Setup and release ZIP include .NET 8 (self-contained x64).
+- Source framework-dependent builds require Microsoft .NET 8 Desktop Runtime (x64).
 - Download: https://dotnet.microsoft.com/download/dotnet/8.0
 - Select ".NET Desktop Runtime" for Windows x64.
 - The .NET SDK is not required to run KiwiDX.
-- Microsoft Edge WebView2 Runtime (required for the receiver map).
+- Microsoft Edge WebView2 Runtime (required for the receiver map and embedded WebSDR support).
 - WebView2 download: https://developer.microsoft.com/microsoft-edge/webview2/
 - Windows Media Foundation MP3 encoder (included with supported Windows 10 and Windows 11 installations).
 - The bundled ffmpeg.exe must remain beside KiwiDX for 480p MP4 waterfall recording.
@@ -20,15 +21,15 @@ Required runtime
 Hardware and connectivity
 -------------------------
 - A Windows-compatible audio output device.
-- An Internet or local-network connection to a KiwiSDR receiver.
+- An Internet or local-network connection to a supported receiver.
 - Firewall access to the HTTP/HTTPS and WebSocket port used by the selected KiwiSDR server.
 
 Files that must be distributed together
 ---------------------------------------
-- KiwiDX_v0.1.47.exe
-- KiwiDX_v0.1.47.dll
-- KiwiDX_v0.1.47.deps.json
-- KiwiDX_v0.1.47.runtimeconfig.json
+- KiwiDX_v0.1.51.exe
+- KiwiDX_v0.1.51.dll
+- KiwiDX_v0.1.51.deps.json
+- KiwiDX_v0.1.51.runtimeconfig.json
 - Microsoft.Web.WebView2.Core.dll
 - Microsoft.Web.WebView2.WinForms.dll
 - The complete runtimes folder generated in Release.
@@ -42,12 +43,14 @@ Files that must be distributed together
 
 Optional file
 -------------
-- KiwiDX_v0.1.47.pdb is only needed for debugging and crash diagnostics.
+- KiwiDX_v0.1.51.pdb is only needed for debugging and crash diagnostics.
 
 Installation
 ------------
-1. Install Microsoft .NET 8 Desktop Runtime if it is not already installed.
-2. Keep all distributed files in the same folder.
-3. Run KiwiDX_v0.1.47.exe.
+1. Run KiwiDX_v0.1.51_Setup_x64.exe, or extract the entire release ZIP.
+2. The installed and published application is KiwiDX.exe; source builds use KiwiDX_v0.1.51.exe.
+3. Install future Setup versions over the existing installation.
+4. User preferences are stored in %LOCALAPPDATA%\KiwiDX and retained on upgrade/uninstall.
+5. On first launch, select the old portable folder when prompted to migrate its settings.
 
 No separate NAudio installation is required. Its libraries are included with KiwiDX.

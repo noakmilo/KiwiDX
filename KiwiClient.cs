@@ -1,5 +1,7 @@
 using System.Net.WebSockets;
 using System.Text;
+using System.Text.Json;
+using System.Globalization;
 using NAudio.Wave;
 
 namespace KiwiDX;
@@ -7,6 +9,7 @@ namespace KiwiDX;
 public sealed class KiwiClient : IAsyncDisposable
 {
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(10) };
+    private volatile int receiverChannel = -1;
     private ClientWebSocket? audioSocket;
     private ClientWebSocket? waterfallSocket;
     private CancellationTokenSource? cancellation;
@@ -48,6 +51,7 @@ public sealed class KiwiClient : IAsyncDisposable
     public event EventHandler<string>? Error;
     public event EventHandler<string>? Log;
     public event EventHandler<string>? ServerInfoChanged;
+    public event EventHandler<TimeSpan?>? ReceiverTimeChanged;
     private long audioPackets;
     private long waterfallPackets;
     private long audioBytes;
@@ -56,6 +60,8 @@ public sealed class KiwiClient : IAsyncDisposable
 
     public async Task ConnectAsync(string input, double frequency, string mode, int bandwidth)
     {
+        receiverChannel = -1;
+        ReceiverTimeChanged?.Invoke(this, null);
         var baseUri = new Uri(input.Contains("://", StringComparison.Ordinal) ? input : "http://" + input);
         var scheme = baseUri.Scheme is "https" or "wss" ? "wss" : "ws";
         var port = baseUri.IsDefaultPort ? (scheme == "wss" ? 443 : 80) : baseUri.Port;
@@ -119,7 +125,7 @@ public sealed class KiwiClient : IAsyncDisposable
         Interlocked.Exchange(ref lastAudioDataTicks, now);
         Interlocked.Exchange(ref lastWaterfallDataTicks, now);
         statsTimer = new System.Threading.Timer(_ => Log?.Invoke(this, $"Status: WF {waterfallPackets} packets/{waterfallBytes} bytes; audio {audioPackets} packets/{audioBytes} bytes; buffer {audioBuffer?.BufferedBytes ?? 0} bytes"), null, 1000, 1000);
-        keepAliveTimer = new System.Threading.Timer(_ => { SendText(audioSocket, audioSendLock, "SET keepalive"); SendText(waterfallSocket, waterfallSendLock, "SET keepalive"); }, null, 5000, 5000);
+        keepAliveTimer = new System.Threading.Timer(_ => { SendText(audioSocket, audioSendLock, "SET keepalive"); SendText(waterfallSocket, waterfallSendLock, "SET keepalive"); if (receiverChannel >= 0) SendText(audioSocket, audioSendLock, $"SET STATS_UPD ch={receiverChannel}"); }, null, 0, 5000);
         watchdogTimer = new System.Threading.Timer(_ => CheckConnectionHealth(), null, 5000, 5000);
         StatusChanged?.Invoke(this, "Connected");
         Log?.Invoke(this, "WebSockets open: audio and waterfall");
@@ -254,6 +260,7 @@ public sealed class KiwiClient : IAsyncDisposable
                 {
                     var message = Encoding.UTF8.GetString(packet, 4, packet.Length - 4);
                     Log?.Invoke(this, $"{(waterfall ? "WF" : "AUD")} server: {message.Trim()}");
+                    ReadReceiverTime(message);
                     var rejection = ClassifyServerRejection(message);
                     if (rejection is not null) { connectionRejected.TrySetResult(rejection); return; }
                     if (!waterfall && message.Contains("audio_rate=", StringComparison.Ordinal))
@@ -312,6 +319,42 @@ public sealed class KiwiClient : IAsyncDisposable
             else _ = HandleConnectionLostAsync("Connection lost: the receiver stopped responding.");
         }
         if (connectionEstablished && !token.IsCancellationRequested) _ = HandleConnectionLostAsync("Connection lost: the receiver closed the connection.");
+    }
+
+    private void ReadReceiverTime(string message)
+    {
+        foreach (var token in message.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
+        {
+            // Audio announces the assigned channel in is_local; rx_chan may arrive on waterfall.
+            var channelText = token.StartsWith("rx_chan=", StringComparison.Ordinal) ? token[8..]
+                : token.StartsWith("is_local=", StringComparison.Ordinal) ? token[9..].Split(',')[0] : null;
+            if (int.TryParse(channelText, out var channel) && channel >= 0)
+                receiverChannel = channel;
+        }
+        const string prefix = "stats_cb=";
+        var start = message.IndexOf(prefix, StringComparison.Ordinal);
+        if (start < 0 || (start > 0 && !char.IsWhiteSpace(message[start - 1]))) return;
+            try
+            {
+                // Preserve spaces inside the JSON, including timezone names.
+                var payload = message[(start + prefix.Length)..].Trim();
+                if (!payload.StartsWith('{')) payload = Uri.UnescapeDataString(payload);
+                var reader = new Utf8JsonReader(Encoding.UTF8.GetBytes(payload));
+                using var json = JsonDocument.ParseValue(ref reader);
+                var root = json.RootElement;
+                TimeSpan? time = null;
+                if (root.TryGetProperty("tl", out var local) && local.ValueKind == JsonValueKind.String &&
+                    TimeSpan.TryParse(local.GetString(), CultureInfo.InvariantCulture, out var parsed) &&
+                    parsed >= TimeSpan.Zero && parsed < TimeSpan.FromDays(1) &&
+                    (!root.TryGetProperty("tn", out var name) || (name.ValueKind == JsonValueKind.String && name.GetString() != "null")))
+                    time = parsed;
+                ReceiverTimeChanged?.Invoke(this, time);
+            }
+            catch (Exception ex) when (ex is JsonException or UriFormatException)
+            {
+                // Optional clock metadata must never interrupt audio reception.
+                Log?.Invoke(this, $"RX clock metadata could not be read: {ex.Message}");
+            }
     }
 
     private static string? ClassifyServerRejection(string message)
