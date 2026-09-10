@@ -117,13 +117,25 @@ class Chat:
     async def command(self, ws, text):
         item = self.clients[ws]
         parts = text.split()
-        register = len(parts) >= 2 and parts[:2] == ["/nick", "register"]
-        login = parts and parts[0] == "/login"
+        command = parts[0].lower() if parts else ""
+        legacy_register = command == "/nick" and len(parts) >= 2 and parts[1].lower() == "register"
+        register = command == "/register" or legacy_register
+        login = command == "/login"
+        if command == "/help":
+            return await self.notice(ws, "Private help (only you can see this):\n"
+                "/help - Show this help.\n"
+                "/nick nickname - Change your guest nick.\n"
+                "/register nick password - Register a nick, then use /login.\n"
+                "/nick register nick password - Alias for /register.\n"
+                "/login nick password - Sign in to your registered nick.\n"
+                "Passwords: 12-128 characters without spaces. Nicks: 3-24 ASCII letters/digits/_/-, starting with a letter.\n"
+                "Commands and their replies are private and are not stored in channel history.\n"
+                "Both channels are joined automatically. Use the tabs to switch channels and Paste RX-Freq to prepare a tuning link.")
         if register or login:
             self.limit((item["ip"], "auth"), 5, 60)
-            args = parts[2:] if register else parts[1:]
+            args = parts[2:] if legacy_register else parts[1:]
             if len(args) != 2 or not NICK.fullmatch(args[0]) or not 12 <= len(args[1]) <= 128:
-                return await self.notice(ws, "Use /nick register nick password or /login nick password. Password: 12-128 characters without spaces; nick: 3-24 letters/digits/_/-.")
+                return await self.notice(ws, "Use /register nick password or /login nick password. Password: 12-128 characters without spaces; nick: 3-24 letters/digits/_/-. Type /help for private help.")
             nick, password = args
             row = self.db.execute("SELECT nick,salt,hash FROM users WHERE nick=?", (nick,)).fetchone()
             if register and row:
@@ -144,13 +156,13 @@ class Chat:
                 return await self.notice(ws, "Nick registered. Use /login nick password to sign in.")
             item["nick"] = row[0]
             item["authenticated"] = True
-        elif len(parts) == 2 and parts[0] == "/nick" and NICK.fullmatch(parts[1]):
+        elif len(parts) == 2 and command == "/nick" and NICK.fullmatch(parts[1]):
             nick = parts[1]
             if self.db.execute("SELECT 1 FROM users WHERE nick=?", (nick,)).fetchone() or not self.available(nick, ws):
                 return await self.notice(ws, "Nick reserved or in use. Choose another or use /login.")
             item["nick"], item["authenticated"] = nick, False
         else:
-            return await self.notice(ws, "Commands: /nick nickname, /nick register nick password, /login nick password. Both channels are joined automatically.")
+            return await self.notice(ws, "Unknown or invalid command. Type /help for private help.")
         await ws.send_json({"type": "identity", "nick": item["nick"], "authenticated": item["authenticated"]})
 
     async def socket(self, request):

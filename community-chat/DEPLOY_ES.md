@@ -107,7 +107,7 @@ Certbot agregará TLS y redirección de HTTP a HTTPS. Aunque la página pueda ca
 2. Introduce `https://chat.example.com` en el panel y pulsa **Open chat**. KiwiDX recuerda esta URL; no almacena la contraseña.
 3. Elige el nick temporal o conserva el ANON aleatorio y pulsa **Connect**. Turnstile verifica la conexión de forma invisible.
 4. Cambia entre las pestañas **#hamradio** y **#shortwave**: ambas permanecen conectadas.
-5. Para registrar un nick escribe `/nick register MiNick UnaClaveLargaDe12OMasCaracteres`. Luego `/login MiNick UnaClaveLargaDe12OMasCaracteres`.
+5. Para registrar un nick escribe `/register MiNick UnaClaveLargaDe12OMasCaracteres` (tambien se admite `/nick register MiNick UnaClaveLargaDe12OMasCaracteres`). Luego `/login MiNick UnaClaveLargaDe12OMasCaracteres`.
 6. Los nicks tienen 3–24 caracteres y comienzan con letra. Se permiten letras ASCII, números, guion y guion bajo. Las contraseñas tienen 12–128 caracteres sin espacios. Las órdenes de contraseña se ocultan mientras se escriben, no se difunden ni se guardan en el historial. Usa una contraseña única para este servicio.
 7. **Set nick** cambia el nick temporal mediante `/nick nuevoNick`. Un nick registrado requiere login. Si se desconecta la sesión, vuelve a iniciar sesión; no hay recuperación automática por correo.
 8. Con un receptor conectado, pulsa **Paste RX-Freq**. Revisa el texto del cuadro y pulsa **Send**. Los demás usuarios de KiwiDX pueden hacer clic en el enlace para cambiar al servidor, frecuencia y modo compartidos. Esto desconecta su receptor anterior. El botón no envía automáticamente.
@@ -137,3 +137,9 @@ sudo chmod 600 /var/backups/kiwidx-chat/chat.sqlite3
 Para actualizar: sube el nuevo código, detén el servicio, copia el código a `/opt/kiwidx-chat`, actualiza dependencias en `.venv` y vuelve a iniciarlo. Conserva `/etc/kiwidx-chat.env` y `/var/lib/kiwidx-chat`. El servicio tiene límites de conexiones, mensajes e intentos de login; un despliegue público todavía necesita supervisión y una política de moderación. No se incluye federación IRC ni administración gráfica de usuarios.
 
 Referencias oficiales: [Turnstile invisible](https://developers.cloudflare.com/turnstile/concepts/widget/), [validación del servidor](https://developers.cloudflare.com/turnstile/get-started/server-side-validation/), [claves de prueba](https://developers.cloudflare.com/turnstile/troubleshooting/testing/), [preparar un droplet](https://docs.digitalocean.com/products/droplets/getting-started/recommended-droplet-setup/).
+
+## Ayuda y privacidad de comandos
+
+Escribe `/help` para ver los comandos disponibles. La ayuda, las respuestas de registro/login y los errores se envian exclusivamente a tu conexion: no se publican en ninguno de los canales ni se guardan en su historial. Todo mensaje que comienza con `/` se procesa como comando privado, incluso si es desconocido o tiene argumentos incorrectos. `/register`, `/login` y `/nick register` ocultan el texto mientras se escribe; los nombres de comandos admiten mayusculas y minusculas.
+
+Para aplicar esta actualizacion a un droplet existente, copia `server.py` y la carpeta `static` a `/opt/kiwidx-chat/`, conservando el entorno y la base de datos, y ejecuta `sudo systemctl restart kiwidx-chat`. Vuelve a abrir la pagina del chat en KiwiDX. No hace falta reinstalar KiwiDX.

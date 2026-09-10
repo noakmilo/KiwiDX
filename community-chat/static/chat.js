@@ -21,7 +21,7 @@ async function connect(){if(connected()){socket.close();return;}if(working)retur
 byId('connect').onclick=connect;
 byId('changeNick').onclick=()=>send('/nick '+byId('nick').value.trim());
 byId('sendForm').onsubmit=e=>{e.preventDefault();const input=byId('message');if(input.value.trim()&&send(input.value.trim())){input.value='';input.type='text';}};
-byId('message').oninput=e=>{e.target.type=/^\/(login|nick\s+register)\b/.test(e.target.value)?'password':'text';};
+byId('message').oninput=e=>{e.target.type=/^\s*\/(login|register|nick\s+register)\b/i.test(e.target.value)?'password':'text';};
 for(const button of document.querySelectorAll('[data-channel]'))button.onclick=()=>{channel=button.dataset.channel;for(const b of document.querySelectorAll('[data-channel]'))b.classList.toggle('active',b===button);byId('hamradio').hidden=channel!=='#hamradio';byId('shortwave').hidden=channel!=='#shortwave';button.textContent=channel;};
 byId('pasteRx').onclick=()=>{if(window.chrome?.webview)window.chrome.webview.postMessage({type:'pasteRx'});else notice('Paste RX-Freq is available inside KiwiDX.');};
 window.setRxDraft=text=>{byId('message').type='text';byId('message').value=text;byId('message').focus();};

@@ -1,5 +1,6 @@
 ## v0.1.52 - 2026-09-09
 
+- Added private /help and /register chat commands; verified credentials, errors and help never reach other clients or channel history.
 - Window slogan is now Community Driven SDR Listener; audio starts on connection with Mute beside Volume.
 - Added optional Community Chat below Console Log with #hamradio/#shortwave tabs and clickable receiver/frequency/mode sharing.
 - Included a Python chat service with registered nicks, persistent history, invisible Turnstile verification and a DigitalOcean deployment guide.

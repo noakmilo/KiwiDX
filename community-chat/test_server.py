@@ -79,6 +79,41 @@ class ChatTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn(password,row)
         self.assertEqual(password_hash(password,row[0]),row[1])
         self.assertEqual(self.app[CHAT_KEY].db.execute('SELECT COUNT(*) FROM messages').fetchone()[0],0)
+    async def test_commands_and_help_are_private_for_both_channels(self):
+        sender, _, _ = await self.join()
+        observer, _, _ = await self.join()
+        password = 'private-credential-12345'
+        commands = [
+            ('  /REGISTER PrivateNick ' + password, 'notice'),
+            ('/LOGIN PrivateNick ' + password, 'identity'),
+            ('/login PrivateNick wrong-password-123', 'notice'),
+            ('/register missing-password', 'notice'),
+            ('/nick register LegacyNick ' + password, 'notice'),
+            ('/help', 'notice'),
+            ('/HELP', 'notice'),
+            ('/unknown ' + password, 'notice'),
+            ('/login PrivateNick ' + password, 'notice'),  # auth rate limit
+        ]
+        for i, (command, expected) in enumerate(commands):
+            response = await self.send(sender, command, ('#hamradio', '#shortwave')[i % 2])
+            self.assertEqual(response['type'], expected)
+            self.assertNotIn(password, json.dumps(response))
+            if command.lower() == '/help':
+                self.assertIn('only you', response['text'])
+                for name in ('/help', '/nick', '/register', '/login'):
+                    self.assertIn(name, response['text'])
+        self.assertEqual(self.app[CHAT_KEY].db.execute('SELECT COUNT(*) FROM messages').fetchone()[0], 0)
+        # A subsequent public message must be the observer's very first event:
+        # any leaked command, help, identity or error would precede this barrier.
+        for channel in ('#hamradio', '#shortwave'):
+            await self.send(sender, 'public-barrier', channel)
+            event = await observer.receive_json(timeout=3)
+            self.assertEqual(event['type'], 'message')
+            self.assertEqual(event['text'], 'public-barrier')
+            self.assertEqual(event['channel'], channel)
+        rows = self.app[CHAT_KEY].db.execute('SELECT text FROM messages').fetchall()
+        self.assertEqual(rows, [('public-barrier',), ('public-barrier',)])
+
     async def test_reserved_and_live_nicks(self):
         first,_,_=await self.join()
         await self.send(first,'/nick register Reserved test-password-12345')
