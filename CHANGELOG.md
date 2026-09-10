@@ -1,3 +1,16 @@
+## v0.1.52 - 2026-09-09
+
+- Window slogan is now Community Driven SDR Listener; audio starts on connection with Mute beside Volume.
+- Added optional Community Chat below Console Log with #hamradio/#shortwave tabs and clickable receiver/frequency/mode sharing.
+- Included a Python chat service with registered nicks, persistent history, invisible Turnstile verification and a DigitalOcean deployment guide.
+- Fixed automatic protocol detection: KiwiSDR uses the native client even when its description mentions OpenWebRX; changing URLs resets the previous protocol selection.
+- Added embedded OpenWebRX and general WebSDR receivers, automatic/manual protocol selection, and protocol-aware favorites.
+- Server URL is now an editable favorites dropdown; receiver state is synchronized for logging.
+- Web receivers retain their band/profile controls; native recording is unavailable for embedded receivers.
+- Added Ham Radio and Shortwave Listening logs from the dial context menu and Logging menu.
+- Capture receiver, local/RX/UTC times, frequency and band; Ham Radio also captures mode.
+- Separate station details, SIMPO text fields, program and comments with persistent categorized log history.
+
 ## v0.1.51 - 2026-09-07
 
 - About includes GitHub and PayPal Donate links with an "Enjoying KiwiDX?" support message.

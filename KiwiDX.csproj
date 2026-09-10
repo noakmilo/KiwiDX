@@ -7,9 +7,9 @@
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
     <DefaultItemExcludes>$(DefaultItemExcludes);dist/**;tests/**</DefaultItemExcludes>
-    <AssemblyName>KiwiDX_v0.1.51</AssemblyName>
-    <Version>0.1.51</Version>
-    <FileVersion>0.1.51.0</FileVersion>
+    <AssemblyName>KiwiDX_v0.1.52</AssemblyName>
+    <Version>0.1.52</Version>
+    <FileVersion>0.1.52.0</FileVersion>
     <RootNamespace>KiwiDX</RootNamespace>
     <ApplicationIcon>icon.ico</ApplicationIcon>
   </PropertyGroup>

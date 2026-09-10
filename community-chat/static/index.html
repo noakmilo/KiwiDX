@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>KiwiDX Community Chat</title><link rel="stylesheet" href="/static/chat.css"><script src="/static/chat.js" defer></script><script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" defer></script></head>
+<body>
+<header><strong>Community Chat</strong><label>Nick <input id="nick" maxlength="24" autocomplete="off" aria-label="Nickname"></label><button id="changeNick">Set nick</button><button id="connect">Connect</button><span id="state" role="status">Disconnected</span></header>
+<nav><button class="active" data-channel="#hamradio">#hamradio</button><button data-channel="#shortwave">#shortwave</button></nav>
+<main><section id="hamradio" role="log" aria-label="Ham radio messages"></section><section id="shortwave" role="log" aria-label="Shortwave messages" hidden></section></main>
+<form id="sendForm"><button type="button" id="pasteRx">Paste RX-Freq</button><input id="message" maxlength="1500" autocomplete="off" spellcheck="false" placeholder="Message or /nick register nick password or /login nick password" aria-label="Message"><button id="send">Send</button></form>
+<footer>Both channels are joined. Passwords: 12–128 characters, no spaces. Messages are public; recent history is stored. Verification uses Cloudflare Turnstile: <a href="https://www.cloudflare.com/privacypolicy/" target="_blank" rel="noopener">Privacy</a> · <a href="https://www.cloudflare.com/website-terms/" target="_blank" rel="noopener">Terms</a></footer><div id="captcha"></div>
+</body></html>

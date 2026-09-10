@@ -1,0 +1,8 @@
+<!doctype html><title>OpenWebRX fixture</title><script>
+var center_freq=7100000,bandwidth=200000,zoom_level=2;
+var d={offset:0,mod:'am',low_cut:-3000,high_cut:3000,get_offset_frequency(){return this.offset},set_offset_frequency(v){this.offset=v},get_secondary_demod(){return false},get_modulation(){return this.mod},setBandpass(v){this.low_cut=v.low_cut;this.high_cut=v.high_cut}};
+function getDemodulators(){return [d]}
+function $(){return {demodulatorPanel(){return {setMode(m){d.mod=m}}}}}
+var audioEngine={setVolume(v){this.volume=v},resume(){this.resumed=true}};
+function zoom_set(v){zoom_level=v}
+</script>

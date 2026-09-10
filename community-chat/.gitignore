@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.venv/
+*.sqlite3*
+chat.db*
+.env

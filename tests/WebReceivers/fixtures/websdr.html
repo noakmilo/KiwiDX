@@ -1,0 +1,10 @@
+<!doctype html><title>WebSDR fixture</title><script>
+var freq=7100, mode='AM',lo=-3,hi=3;
+function nominalfreq(){return freq}
+function setfreqif(v){freq=parseFloat(v)}
+function set_mode(v){mode=v.toUpperCase()}
+function updbw(){}
+function set_volume(v){window.volume=v}
+function setmute(v){window.muted=v}
+var soundapplet={audioresume(){window.resumed=true}};
+</script>

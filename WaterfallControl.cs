@@ -50,6 +50,8 @@ public sealed class WaterfallControl : Control
     public event EventHandler<double>? CursorMoved;
     public event EventHandler<int>? BandwidthChanged;
     public event EventHandler<(double center, double span)>? ViewChanged;
+    public event EventHandler<double>? AddHamLogRequested;
+    public event EventHandler<double>? AddShortwaveLogRequested;
     public event EventHandler<double>? AddBookmarkRequested;
     public double TunedFrequency => tunedFrequency;
 
@@ -98,6 +100,8 @@ public sealed class WaterfallControl : Control
         MouseUp += OnMouseUp;
         MouseWheel += OnMouseWheel;
         dialContextMenu.Items.Add("Add Bookmark", null, (_, _) => AddBookmarkRequested?.Invoke(this, tunedFrequency));
+        dialContextMenu.Items.Add("Log Ham Radio...", null, (_, _) => AddHamLogRequested?.Invoke(this, tunedFrequency));
+        dialContextMenu.Items.Add("Log Shortwave Listening...", null, (_, _) => AddShortwaveLogRequested?.Invoke(this, tunedFrequency));
         BuildPalette();
     }
 

@@ -25,6 +25,16 @@ internal sealed class ReceiverClocks : Control
         Invalidate();
     }
 
+    internal string GetReceiverTime(DateTimeOffset now)
+    {
+        if (ReceiverZone is not null)
+            return TimeZoneInfo.ConvertTime(now, ReceiverZone).ToString("yyyy-MM-dd HH:mm:ss zzz", CultureInfo.InvariantCulture);
+        var elapsed = TimeSpan.FromMilliseconds(Environment.TickCount64 - receivedAt);
+        return receiverTime.HasValue && elapsed.TotalSeconds < 30
+            ? DateTime.Today.Add(receiverTime.Value + elapsed).ToString("HH:mm:ss", CultureInfo.InvariantCulture)
+            : "Not available";
+    }
+
     protected override void OnPaint(PaintEventArgs e)
     {
         base.OnPaint(e);

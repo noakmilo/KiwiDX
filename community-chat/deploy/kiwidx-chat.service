@@ -1,0 +1,29 @@
+[Unit]
+Description=KiwiDX Community Chat
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=kiwidx-chat
+Group=kiwidx-chat
+WorkingDirectory=/opt/kiwidx-chat
+EnvironmentFile=/etc/kiwidx-chat.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/kiwidx-chat/.venv/bin/python -u /opt/kiwidx-chat/server.py
+Restart=on-failure
+RestartSec=3
+StateDirectory=kiwidx-chat
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+MemoryMax=512M
+TasksMax=128
+TimeoutStopSec=15
+
+[Install]
+WantedBy=multi-user.target

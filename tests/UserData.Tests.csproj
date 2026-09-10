@@ -5,5 +5,5 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
-  <ItemGroup><Compile Include="../UserData.cs" Link="UserData.cs" /></ItemGroup>
+  <ItemGroup><Compile Remove="WebReceivers/**/*.cs" /><Compile Include="../UserData.cs" Link="UserData.cs" /><Compile Include="../ListeningLog.cs" Link="ListeningLog.cs" /></ItemGroup>
 </Project>

@@ -1,6 +1,9 @@
 namespace KiwiDX;
 
-internal sealed record FavoriteServer(string Title, string Location, string Url);
+internal sealed record FavoriteServer(string Title, string Location, string Url)
+{
+    public string Protocol { get; init; } = "Auto";
+}
 
 internal sealed record StartupConfiguration
 {

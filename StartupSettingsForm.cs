@@ -52,11 +52,6 @@ internal sealed class StartupSettingsForm : Form
         connectBox.Text = "Connect automatically when KiwiDX starts";
         connectBox.AutoSize = true;
         connectBox.Checked = current.ConnectOnStartup;
-        playBox.Text = "Start audio automatically";
-        playBox.AutoSize = true;
-        playBox.Checked = current.PlayOnStartup && current.ConnectOnStartup;
-        playBox.Enabled = connectBox.Checked;
-        connectBox.CheckedChanged += (_, _) => { playBox.Enabled = connectBox.Checked; if (!connectBox.Checked) playBox.Checked = false; };
 
         var grid = new TableLayoutPanel { Dock = DockStyle.Top, Height = 250, ColumnCount = 2, RowCount = 6, Padding = new Padding(16, 18, 16, 8) };
         grid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
@@ -76,7 +71,7 @@ internal sealed class StartupSettingsForm : Form
         grid.Controls.Add(new Label { Text = "WF maximum (dB):", AutoSize = true, Anchor = AnchorStyles.Left }, 0, 3);
         grid.Controls.Add(waterfallMaximumBox, 1, 3);
         grid.Controls.Add(connectBox, 1, 4);
-        grid.Controls.Add(playBox, 1, 5);
+        grid.Controls.Add(new Label { Text = "Audio starts on connection. Use Mute beside Volume.", AutoSize = true }, 1, 5);
 
         var save = new Button { Text = "Save", DialogResult = DialogResult.OK, Size = new Size(82, 29), Location = new Point(281, 273) };
         var cancel = new Button { Text = "Cancel", DialogResult = DialogResult.Cancel, Size = new Size(82, 29), Location = new Point(371, 273) };
@@ -93,7 +88,7 @@ internal sealed class StartupSettingsForm : Form
                 ServerUrl = ((ServerChoice)serverBox.SelectedItem!).Url,
                 FrequencyMHz = (double)frequencyBox.Value,
                 ConnectOnStartup = connectBox.Checked,
-                PlayOnStartup = playBox.Checked,
+                PlayOnStartup = true,
                 WaterfallMinimumDb = (int)waterfallMinimumBox.Value,
                 WaterfallMaximumDb = (int)waterfallMaximumBox.Value
             };
