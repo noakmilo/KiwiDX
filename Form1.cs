@@ -11,42 +11,32 @@ public partial class Form1 : Form
     private readonly ComboBox protocolBox = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 110 };
     private bool syncingWebState;
     private readonly TextBox frequencyBox = new();
-    private readonly ComboBox modeBox = new();
+    private readonly RadioComboBox modeBox = new();
     private readonly NumericUpDown bandwidthBox = new();
     private readonly Label statusLabel = new();
     private readonly Label cursorLabel = new();
     private readonly ReceiverClocks clocks = new() { Dock = DockStyle.Right };
-    private readonly Button connectButton = new();
+    private readonly RadioButton connectButton = new();
     private readonly CheckBox muteBox = new() { Text = "Mute", AutoSize = true };
-    private readonly CheckBox communityChatCheckBox = new() { Text = "Community Chat", AutoSize = true };
-    private readonly GroupBox chatPanel = new() { Text = "Community Chat", Dock = DockStyle.Fill };
+    private readonly Panel chatPanel = new() { Dock = DockStyle.Fill };
     private readonly CommunityChatControl communityChat = new();
-    private readonly Button recordButton = new();
+    private readonly RadioButton recordButton = new() { Glyph = RadioGlyph.Dot, GlyphColor = WorkspaceTheme.Green };
     private readonly CheckBox recordWaterfallCheckBox = new();
     private readonly System.Windows.Forms.Timer waterfallRecordingTimer = new() { Interval = 100 };
-    private readonly TrackBar volumeBar = new();
+    private readonly RadioSlider volumeBar = new();
     private readonly TextBox consoleBox = new();
     private readonly NumericUpDown wfMinBox = new();
     private readonly NumericUpDown wfMaxBox = new();
-    private readonly ComboBox bandBox = new();
-    private readonly TrackBar zoomBar = new();
-    private readonly Label zoomLabel = new();
-    private readonly HScrollBar spectrumBar = new();
-    private readonly Label spectrumRangeLabel = new();
-    private readonly Label spectrumCenterLabel = new();
-    private readonly CheckBox consoleLogCheckBox = new();
-    private readonly CheckBox serverInfoCheckBox = new();
+    private readonly RadioComboBox bandBox = new();
+    private readonly RadioSlider zoomBar = new();
     private readonly ToolStripMenuItem favoritesMenu = new("Favorites");
     private readonly ToolStripMenuItem myBookmarksMenu = new("My Bookmarks");
-    private readonly Button favoriteButton = new();
+    private readonly RadioButton favoriteButton = new() { Glyph = RadioGlyph.Star, GlyphColor = Color.FromArgb(249, 199, 73) };
     private readonly ToolTip favoriteToolTip = new();
     private readonly SemaphoreSlim connectionGate = new(1, 1);
     private readonly RichTextBox serverInfoBox = new();
-    private readonly GroupBox consolePanel = new();
-    private readonly GroupBox serverInfoPanel = new();
     private readonly Panel waterfallHost = new() { Dock = DockStyle.Fill, BackColor = Color.Black, Padding = Padding.Empty };
     private readonly Panel receiverDisplayHost = new() { Dock = DockStyle.Fill, BackColor = Color.Black, Padding = Padding.Empty };
-    private readonly FlowLayoutPanel dialPanel = new();
     private TableLayoutPanel? mainLayout;
     private Control? navigationBar;
     private bool updatingNavigation;
@@ -110,17 +100,18 @@ public partial class Form1 : Form
 
     public Form1()
     {
-        Text = "KiwiDX v0.1.52 - Community Driven SDR Listener";
+        Text = "KiwiDX v0.2.0 - Community Driven SDR Listener";
         Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
-        Width = 1180;
-        Height = 760;
-        MinimumSize = new Size(850, 560);
+        Width = 1440;
+        Height = 900;
+        WindowState = FormWindowState.Maximized;
+        MinimumSize = new Size(1100, 650);
+        Font = new Font("Segoe UI", 10);
+        AutoScaleMode = AutoScaleMode.Dpi;
         BackColor = Color.FromArgb(22, 27, 32);
         ForeColor = Color.Gainsboro;
 
         var menuStrip = BuildMenuStrip();
-        var top = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Padding = new Padding(8), WrapContents = true, BackColor = Color.FromArgb(35, 42, 48) };
-        top.Controls.Add(new Label { Text = "KiwiDX v0.1.52", AutoSize = true, ForeColor = Color.Gold, Font = new Font(Font, FontStyle.Bold), Padding = new Padding(0, 7, 8, 0) });
         startupConfiguration = LoadStartupConfiguration();
         urlBox.Width = 260;
         urlBox.Text = startupConfiguration.ServerUrl;
@@ -143,12 +134,12 @@ public partial class Form1 : Form
         connectButton.Text = "Connect";
         connectButton.AutoSize = true;
         connectButton.Click += async (_, _) => await ToggleConnection();
-        var mapButton = new Button { Text = "🗺 Map", AutoSize = true, BackColor = Color.FromArgb(42, 91, 120), ForeColor = Color.White, UseVisualStyleBackColor = false };
+        var mapButton = new RadioButton { Text = "Map", Glyph = RadioGlyph.Globe };
         mapButton.Click += (_, _) => OpenReceiverMap();
-        favoriteButton.Text = "☆"; favoriteButton.AutoSize = false; favoriteButton.Size = new Size(26, urlBox.PreferredHeight); favoriteButton.Margin = urlBox.Margin; favoriteButton.Padding = Padding.Empty; favoriteButton.BackColor = top.BackColor; favoriteButton.ForeColor = Color.Gold; favoriteButton.FlatStyle = FlatStyle.Flat; favoriteButton.Font = new Font("Segoe UI Symbol", 10, FontStyle.Regular); favoriteButton.TextAlign = ContentAlignment.MiddleCenter; favoriteButton.UseVisualStyleBackColor = false; favoriteButton.TabStop = false;
+        favoriteButton.Text = "☆"; favoriteButton.AutoSize = false; favoriteButton.Size = new Size(26, urlBox.PreferredHeight); favoriteButton.Margin = urlBox.Margin; favoriteButton.Padding = Padding.Empty; favoriteButton.BackColor = WorkspaceTheme.Surface; favoriteButton.ForeColor = Color.Gold; favoriteButton.FlatStyle = FlatStyle.Flat; favoriteButton.Font = new Font("Segoe UI Symbol", 10, FontStyle.Regular); favoriteButton.TextAlign = ContentAlignment.MiddleCenter; favoriteButton.UseVisualStyleBackColor = false; favoriteButton.TabStop = false;
         favoriteButton.FlatAppearance.BorderSize = 0;
-        favoriteButton.FlatAppearance.MouseOverBackColor = top.BackColor;
-        favoriteButton.FlatAppearance.MouseDownBackColor = top.BackColor;
+        favoriteButton.FlatAppearance.MouseOverBackColor = WorkspaceTheme.Surface;
+        favoriteButton.FlatAppearance.MouseDownBackColor = WorkspaceTheme.Surface;
         favoriteButton.Click += (_, _) => ToggleCurrentServerFavorite();
         favoriteToolTip.SetToolTip(favoriteButton, "Add this server to Favorites");
         frequencyBox.Width = 100;
@@ -166,9 +157,9 @@ public partial class Form1 : Form
         bandwidthBox.Increment = 50;
         bandwidthBox.Value = 2400;
         bandwidthBox.ValueChanged += (_, _) => SendBandwidth();
-        recordButton.Text = "â— Record";
+        recordButton.Text = "Record";
         recordButton.AutoSize = true;
-        recordButton.BackColor = Color.FromArgb(65, 70, 75);
+        recordButton.BackColor = Color.FromArgb(30, 125, 70);
         recordButton.ForeColor = Color.White;
         recordButton.FlatStyle = FlatStyle.Flat;
         recordButton.UseVisualStyleBackColor = false;
@@ -184,8 +175,6 @@ public partial class Form1 : Form
         volumeBar.TickFrequency = 25;
         volumeBar.ValueChanged += (_, _) => ApplyAudioPreferences();
         muteBox.CheckedChanged += (_, _) => ApplyAudioPreferences();
-        var centerButton = new Button { Text = "Center", AutoSize = true };
-        centerButton.Click += (_, _) => { if (webReceiver is not null) webReceiver.CenterWaterfall(); else waterfall.CenterOnTune(); };
         bandBox.Width = 175;
         bandBox.DropDownStyle = ComboBoxStyle.DropDownList;
         bandBox.Items.AddRange(Bands.Cast<object>().ToArray());
@@ -197,39 +186,9 @@ public partial class Form1 : Form
         ConfigureDbControl(wfMaxBox, startupWfMax);
         wfMinBox.ValueChanged += (_, _) => ApplyWaterfallRange();
         wfMaxBox.ValueChanged += (_, _) => ApplyWaterfallRange();
-        consoleLogCheckBox.Text = "Console Log"; consoleLogCheckBox.AutoSize = true; consoleLogCheckBox.Checked = false; consoleLogCheckBox.Padding = new Padding(0, 5, 0, 0);
-        serverInfoCheckBox.Text = "Server Info"; serverInfoCheckBox.AutoSize = true; serverInfoCheckBox.Checked = true; serverInfoCheckBox.Padding = new Padding(0, 5, 0, 0);
-        consoleLogCheckBox.CheckedChanged += (_, _) => UpdateOptionalPanels();
-        serverInfoCheckBox.CheckedChanged += (_, _) => UpdateOptionalPanels();
-        var serverLabel = new Label { Text = "Server:", AutoSize = true, ForeColor = Color.LimeGreen, Font = new Font(Font, FontStyle.Bold), Padding = new Padding(0, 7, 0, 0) };
-        var bandwidthGroup = new FlowLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, WrapContents = false, Margin = Padding.Empty, Padding = Padding.Empty };
-        bandwidthGroup.Controls.Add(new Label { Text = "BW Hz", AutoSize = true, Padding = new Padding(0, 7, 0, 0) });
-        bandwidthGroup.Controls.Add(bandwidthBox);
-        var recordingGroup = new FlowLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, WrapContents = false, Margin = Padding.Empty, Padding = Padding.Empty };
-        recordingGroup.Controls.Add(new Label { Text = "Recording", AutoSize = true, ForeColor = Color.Gold, Font = new Font(Font, FontStyle.Bold), Padding = new Padding(0, 7, 2, 0) });
-        recordingGroup.Controls.Add(recordButton);
-        recordingGroup.Controls.Add(recordWaterfallCheckBox);
-        top.Controls.AddRange(new Control[] { serverLabel, urlBox, protocolBox, connectButton, mapButton, new Label { Text = "Band", AutoSize = true, Padding = new Padding(0, 7, 0, 0) }, bandBox, new Label { Text = "MHz", AutoSize = true, Padding = new Padding(0, 7, 0, 0) }, frequencyBox, modeBox, bandwidthGroup, recordingGroup, new Label { Text = "Vol", AutoSize = true, Padding = new Padding(0, 7, 0, 0) }, volumeBar, muteBox, centerButton, new Label { Text = "WF min", AutoSize = true, Padding = new Padding(0, 7, 0, 0) }, wfMinBox, new Label { Text = "WF max", AutoSize = true, Padding = new Padding(0, 7, 0, 0) }, wfMaxBox, consoleLogCheckBox, serverInfoCheckBox, communityChatCheckBox });
-        top.Controls.Add(favoriteButton);
-        top.Controls.SetChildIndex(favoriteButton, 3);
-
         navigationBar = BuildNavigationBar();
-        dialPanel.Dock = DockStyle.Top;
-        dialPanel.Height = 38;
-        dialPanel.WrapContents = false;
-        dialPanel.AutoScroll = false;
-        dialPanel.FlowDirection = FlowDirection.LeftToRight;
-        dialPanel.Padding = new Padding(6, 4, 0, 3);
-        dialPanel.BackColor = Color.FromArgb(210, 18, 24, 30);
-        dialPanel.Controls.Add(new Label { Text = "DIAL", AutoSize = true, ForeColor = Color.Gold, Font = new Font(Font, FontStyle.Bold), Padding = new Padding(0, 6, 5, 0) });
-        dialPanel.Controls.AddRange(new Control[]
-        {
-            CreateDialButton("---", -100_000), CreateDialButton("--", -10_000), CreateDialButton("-", -1_000),
-            CreateDialButton("+", 1_000), CreateDialButton("++", 10_000), CreateDialButton("+++", 100_000)
-        });
         receiverDisplayHost.Controls.Add(waterfall);
         waterfallHost.Controls.Add(receiverDisplayHost);
-        waterfallHost.Controls.Add(dialPanel);
 
         waterfall.Dock = DockStyle.Fill;
         waterfall.CursorChangedByUser += (_, frequency) => { frequencyBox.Text = (frequency / 1_000_000d).ToString("0.000000", CultureInfo.InvariantCulture); client.SetFrequency(frequency); };
@@ -247,17 +206,6 @@ public partial class Form1 : Form
         statusLabel.Padding = new Padding(8, 5, 0, 0);
         cursorLabel.AutoSize = true;
         cursorLabel.Padding = new Padding(8, 5, 0, 0);
-        var bottom = new Panel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(35, 42, 48) };
-        var bottomText = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = Padding.Empty };
-        bottomText.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 55));
-        bottomText.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45));
-        statusLabel.AutoSize = cursorLabel.AutoSize = false;
-        statusLabel.AutoEllipsis = cursorLabel.AutoEllipsis = true;
-        statusLabel.Dock = cursorLabel.Dock = DockStyle.Fill;
-        bottomText.Controls.Add(statusLabel, 0, 0);
-        bottomText.Controls.Add(cursorLabel, 1, 0);
-        bottom.Controls.Add(bottomText);
-        bottom.Controls.Add(clocks);
         consoleBox.Dock = DockStyle.Fill;
         consoleBox.Multiline = true;
         consoleBox.ReadOnly = true;
@@ -265,12 +213,6 @@ public partial class Form1 : Form
         consoleBox.BackColor = Color.FromArgb(10, 13, 15);
         consoleBox.ForeColor = Color.LightGreen;
         consoleBox.Font = new Font(Font.FontFamily, 8.5f);
-        consolePanel.Text = "CONSOLE LOG";
-        consolePanel.Dock = DockStyle.Fill;
-        consolePanel.ForeColor = Color.LightGreen;
-        consolePanel.BackColor = Color.FromArgb(10, 13, 15);
-        consolePanel.Padding = new Padding(6, 4, 6, 6);
-        consolePanel.Controls.Add(consoleBox);
         serverInfoBox.Dock = DockStyle.Fill;
         serverInfoBox.Multiline = true;
         serverInfoBox.ReadOnly = true;
@@ -280,47 +222,19 @@ public partial class Form1 : Form
         serverInfoBox.ForeColor = Color.Gainsboro;
         serverInfoBox.Font = new Font(Font.FontFamily, 8.5f);
         serverInfoBox.Text = "Connect to a KiwiSDR to view server information.";
-        serverInfoPanel.Text = "SERVER INFO";
-        serverInfoPanel.Dock = DockStyle.Fill;
-        serverInfoPanel.ForeColor = Color.Gold;
-        serverInfoPanel.BackColor = Color.FromArgb(24, 31, 37);
-        serverInfoPanel.Padding = new Padding(6, 4, 6, 6);
-        serverInfoPanel.Controls.Add(serverInfoBox);
-        var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 7, Margin = Padding.Empty, Padding = Padding.Empty };
-        mainLayout = layout;
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 66));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 112));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 125));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 0));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 30));
-        layout.Controls.Add(top, 0, 0);
-        layout.Controls.Add(waterfallHost, 0, 1);
-        layout.Controls.Add(navigationBar, 0, 2);
-        layout.Controls.Add(serverInfoPanel, 0, 3);
-        layout.Controls.Add(consolePanel, 0, 4);
-        chatPanel.Controls.Add(communityChat);
         communityChat.GetReceiver = GetChatReceiverAsync;
         communityChat.TuneReceiver = TuneChatReceiverAsync;
-        communityChatCheckBox.CheckedChanged += (_, _) => UpdateOptionalPanels();
-        layout.Controls.Add(chatPanel, 0, 5);
-        layout.Controls.Add(bottom, 0, 6);
-        Controls.Add(layout);
-        Controls.Add(menuStrip);
-        MainMenuStrip = menuStrip;
+        BuildWorkspace(menuStrip, mapButton);
 
-        client.WaterfallLine += (_, line) =>
+        client.WaterfallLine += (_, line) => Interlocked.Exchange(ref pendingWaterfallLine, line);
+        receiverUiTimer.Tick += (_, _) =>
         {
-            if (IsDisposed) return;
-            BeginInvoke(() =>
-            {
-                waterfall.AddLine(line);
-                wfUiLines++;
-                if (wfUiLines == 1 || wfUiLines % 10 == 0) statusLabel.Text = $"Connected | WF: {wfUiLines} lines ({line.Length} bins)";
-            });
+            RefreshConsole();
+            var line = Interlocked.Exchange(ref pendingWaterfallLine, null);
+            if (line is not null) { waterfall.AddLine(line); wfUiLines++; }
         };
+        receiverUiTimer.Start();
+        Disposed += (_, _) => receiverUiTimer.Dispose();
         client.StatusChanged += (_, status) =>
         {
             if (IsDisposed) return;
@@ -338,35 +252,18 @@ public partial class Form1 : Form
             });
         };
         client.Error += (_, error) => { if (!IsDisposed) BeginInvoke(() => MessageBox.Show(this, error, "KiwiSDR", MessageBoxButtons.OK, MessageBoxIcon.Warning)); };
-        client.Log += (_, message) => { if (!IsDisposed) BeginInvoke(() => AddLog(message)); };
+        client.Log += (_, message) => AddLog(message);
+        client.ConnectionProgress += (_, progress) => { if (!IsDisposed && IsHandleCreated) BeginInvoke(() => { if (!connectButton.Enabled) ShowConnectionProgress(progress.Percent, progress.Stage); }); };
         client.ServerInfoChanged += (_, info) => { if (!IsDisposed) BeginInvoke(() => SetServerInfo(info)); };
         client.ReceiverTimeChanged += (_, time) => { if (!IsDisposed) BeginInvoke(() => { if (webReceiver is null) clocks.SetReceiverTime(time); }); };
         FormClosing += async (_, _) => { DeactivateWebReceiver(); await CancelWaterfallRecordingAsync(); await client.DisposeAsync(); };
-        Resize += (_, _) => urlBox.Width = Math.Clamp(ClientSize.Width / 4, 150, 300);
+
         SyncNavigation(7_100_000, currentViewSpan);
-        UpdateOptionalPanels();
         ApplyWaterfallRange();
         RefreshFavoritesMenu();
         frequencyBookmarks = LoadFrequencyBookmarks();
         RefreshFrequencyBookmarks();
-        Shown += async (_, _) => await ApplyStartupConfiguration();
-    }
-
-    private void UpdateOptionalPanels()
-    {
-        if (mainLayout is null) return;
-        serverInfoPanel.Visible = serverInfoCheckBox.Checked;
-        consolePanel.Visible = consoleLogCheckBox.Checked;
-        chatPanel.Visible = communityChatCheckBox.Checked;
-        mainLayout.RowStyles[5].Height = communityChatCheckBox.Checked ? 280 : 0;
-        mainLayout.RowStyles[3].Height = serverInfoCheckBox.Checked ? 112 : 0;
-        mainLayout.RowStyles[4].Height = consoleLogCheckBox.Checked ? 150 : 0;
-        if (consoleLogCheckBox.Checked)
-        {
-            mainLayout.SetCellPosition(consolePanel, new TableLayoutPanelCellPosition(0, 4));
-            consolePanel.BringToFront();
-        }
-        mainLayout.PerformLayout();
+        Shown += async (_, _) => { FitWorkspace(); _ = communityChat.ActivateAsync(); await ApplyStartupConfiguration(); };
     }
 
     private void SetServerInfo(string info)
@@ -408,53 +305,20 @@ public partial class Form1 : Form
 
     private Control BuildNavigationBar()
     {
-        var panel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 7, RowCount = 2, BackColor = Color.FromArgb(30, 36, 42), Padding = new Padding(8, 3, 8, 3) };
-        panel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 160));
-        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 42));
-        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 38));
-        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 38));
-        panel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
-        panel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        panel.Controls.Add(new Label { Text = "Zoom", AutoSize = true, ForeColor = Color.White, Anchor = AnchorStyles.Left }, 0, 0);
-        zoomBar.Minimum = 0; zoomBar.Maximum = 14; zoomBar.Value = 11; zoomBar.TickFrequency = 1; zoomBar.Dock = DockStyle.Fill;
-        zoomBar.ValueChanged += (_, _) => { zoomLabel.Text = $"Z{zoomBar.Value}"; if (!updatingNavigation) waterfall.SetZoomLevel(zoomBar.Value); };
-        panel.Controls.Add(zoomBar, 1, 0);
-        zoomLabel.Text = "Z11"; zoomLabel.AutoSize = true; zoomLabel.ForeColor = Color.Gold; zoomLabel.Font = new Font(Font, FontStyle.Bold); zoomLabel.Anchor = AnchorStyles.Left;
-        panel.Controls.Add(zoomLabel, 2, 0);
-        var zoomButtons = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, FlowDirection = FlowDirection.LeftToRight, Margin = Padding.Empty, Padding = Padding.Empty };
-        var zoomOutButton = new Button { Text = "Zoom −", AutoSize = false, Size = new Size(72, 25), Margin = new Padding(0, 1, 3, 0) };
-        var zoomInButton = new Button { Text = "Zoom +", AutoSize = false, Size = new Size(72, 25), Margin = new Padding(0, 1, 0, 0) };
-        zoomOutButton.Click += (_, _) => { if (webReceiver is not null) webReceiver.ZoomOut(); else waterfall.ZoomOut(); };
-        zoomInButton.Click += (_, _) => { if (webReceiver is not null) webReceiver.ZoomIn(); else waterfall.ZoomIn(); };
-        zoomButtons.Controls.AddRange(new Control[] { zoomOutButton, zoomInButton });
-        panel.Controls.Add(zoomButtons, 1, 1);
-        panel.SetColumnSpan(zoomButtons, 2);
-        var leftButton = CreateSpectrumButton("◀", -1);
-        var rightButton = CreateSpectrumButton("▶", 1);
-        panel.Controls.Add(leftButton, 3, 1);
-        spectrumBar.Minimum = 0; spectrumBar.Maximum = 29_999_999; spectrumBar.LargeChange = (int)currentViewSpan; spectrumBar.SmallChange = Math.Max(1, (int)currentViewSpan / 20); spectrumBar.Dock = DockStyle.Fill;
-        spectrumBar.Scroll += (_, _) => { if (!updatingNavigation) waterfall.PanTo(spectrumBar.Value + currentViewSpan / 2); };
-        panel.Controls.Add(spectrumBar, 4, 1);
-        panel.Controls.Add(rightButton, 5, 1);
-        spectrumRangeLabel.Text = "0.000000 — 30.000000 MHz"; spectrumRangeLabel.AutoSize = true; spectrumRangeLabel.ForeColor = Color.Silver; spectrumRangeLabel.Anchor = AnchorStyles.Right;
-        panel.Controls.Add(spectrumRangeLabel, 6, 0);
-        spectrumCenterLabel.Text = "Center 7.100000 MHz"; spectrumCenterLabel.AutoSize = true; spectrumCenterLabel.ForeColor = Color.Cyan; spectrumCenterLabel.Font = new Font(Font, FontStyle.Bold); spectrumCenterLabel.Anchor = AnchorStyles.None;
-        panel.Controls.Add(spectrumCenterLabel, 4, 0);
-        panel.SetColumnSpan(spectrumCenterLabel, 2);
-        var spectrumTitle = new Label { Text = "EXPLORE SPECTRUM", AutoSize = true, ForeColor = Color.White, Font = new Font(Font, FontStyle.Bold), Anchor = AnchorStyles.Left };
-        panel.Controls.Add(spectrumTitle, 3, 0);
+        var panel = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, BackColor = WorkspaceTheme.Surface, Padding = new Padding(8, 4, 8, 4), Margin = Padding.Empty };
+        zoomBar.Minimum = 0; zoomBar.Maximum = 14; zoomBar.Value = 11; zoomBar.Width = 180; zoomBar.Height = 32;
+        zoomBar.ValueChanged += (_, _) => { if (!updatingNavigation) waterfall.SetZoomLevel(zoomBar.Value); };
+        var minus = new RadioButton { Glyph = RadioGlyph.Minus, Width = 30, Height = 30 };
+        var plus = new RadioButton { Glyph = RadioGlyph.Plus, Width = 30, Height = 30 };
+        minus.AccessibleName = "Zoom out"; plus.AccessibleName = "Zoom in";
+        minus.Click += (_, _) => { if (webReceiver is not null) webReceiver.ZoomOut(); else waterfall.ZoomOut(); };
+        plus.Click += (_, _) => { if (webReceiver is not null) webReceiver.ZoomIn(); else waterfall.ZoomIn(); };
+        var center = new RadioButton { Text = "Center", Width = 82, Height = 32 };
+        center.Click += (_, _) => { if (webReceiver is not null) webReceiver.CenterWaterfall(); else waterfall.CenterOnTune(); };
+        var display = new RadioButton { Text = "Display settings", Glyph = RadioGlyph.Gear, Width = 174, Height = 32 };
+        display.Click += (_, _) => OpenDisplaySettings();
+        panel.Controls.AddRange(new Control[] { WorkspaceTheme.Label("Zoom"), minus, zoomBar, plus, center, display });
         return panel;
-    }
-
-    private Button CreateSpectrumButton(string text, int direction)
-    {
-        var button = new Button { Text = text, Dock = DockStyle.Fill, Margin = new Padding(2, 0, 2, 0), FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(48, 65, 76), ForeColor = Color.White, UseVisualStyleBackColor = false };
-        button.FlatAppearance.BorderColor = Color.SlateGray;
-        button.Click += (_, _) => waterfall.PanTo(spectrumBar.Value + currentViewSpan / 2 + direction * currentViewSpan / 5);
-        return button;
     }
 
     private void SyncNavigation(double center, double span)
@@ -465,13 +329,6 @@ public partial class Form1 : Form
             currentViewSpan = span;
             var zoom = SpanToZoom(span);
             zoomBar.Value = zoom;
-            zoomLabel.Text = $"Z{zoom}";
-            spectrumBar.LargeChange = Math.Clamp((int)Math.Round(span), 1, 30_000_000);
-            spectrumBar.SmallChange = Math.Max(1, spectrumBar.LargeChange / 20);
-            var maximumValue = Math.Max(0, spectrumBar.Maximum - spectrumBar.LargeChange + 1);
-            spectrumBar.Value = Math.Clamp((int)Math.Round(center - span / 2), 0, maximumValue);
-            spectrumCenterLabel.Text = $"Center {center / 1_000_000:0.000000} MHz";
-            spectrumRangeLabel.Text = $"{Math.Max(0, center - span / 2) / 1_000_000:0.000000} — {Math.Min(30_000_000, center + span / 2) / 1_000_000:0.000000} MHz";
         }
         finally { updatingNavigation = false; }
     }
@@ -494,20 +351,6 @@ public partial class Form1 : Form
     }
 
     private static int SpanToZoom(double span) => Math.Clamp((int)Math.Round(Math.Log(30_000_000d / span, 2)), 0, 14);
-
-    private Button CreateDialButton(string text, double deltaHz)
-    {
-        var button = new Button
-        {
-            Text = text, AutoSize = false, Size = new Size(42, 27), Margin = new Padding(2, 0, 2, 0), Tag = deltaHz,
-            BackColor = deltaHz < 0 ? Color.FromArgb(170, 48, 62) : Color.FromArgb(28, 125, 145),
-            ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font(Font, FontStyle.Bold), UseVisualStyleBackColor = false
-        };
-        button.FlatAppearance.BorderColor = deltaHz < 0 ? Color.OrangeRed : Color.Cyan;
-        button.Click += (_, _) => MoveDial(deltaHz);
-        new ToolTip().SetToolTip(button, $"Move dial {(deltaHz > 0 ? "+" : "")}{deltaHz / 1_000:0} kHz");
-        return button;
-    }
 
     private void MoveDial(double deltaHz)
     {
@@ -538,10 +381,30 @@ public partial class Form1 : Form
         webReceiver?.SetBandwidth(band.Bandwidth);
     }
 
+    // Keep only the latest display frame when the UI cannot keep up with the receiver.
+    private byte[]? pendingWaterfallLine;
+    private readonly System.Windows.Forms.Timer receiverUiTimer = new() { Interval = 33 };
+
+    private readonly Queue<string> consoleHistory = new();
+    private int consoleHistoryLength;
+    private bool consoleDirty;
     private void AddLog(string message)
     {
-        consoleBox.AppendText($"[{DateTime.Now:HH:mm:ss}] {message}{Environment.NewLine}");
-        if (consoleBox.TextLength > 20000) consoleBox.Text = consoleBox.Text[^16000..];
+        // Never touch the native edit control while its tool window is hidden/uncreated.
+        var entry = $"[{DateTime.Now:HH:mm:ss}] {(message.Length > 2048 ? message[..2048] + " [truncated]" : message)}{Environment.NewLine}";
+        lock (consoleHistory)
+        {
+        consoleHistory.Enqueue(entry); consoleHistoryLength += entry.Length;
+        while (consoleHistoryLength > 20000 && consoleHistory.Count > 1) consoleHistoryLength -= consoleHistory.Dequeue().Length;
+        consoleDirty = true;
+        }
+    }
+    private void RefreshConsole()
+    {
+        if (consoleWindow is not { Visible: true }) return;
+        string snapshot;
+        lock (consoleHistory) { if (!consoleDirty) return; snapshot = string.Concat(consoleHistory); consoleDirty = false; }
+        consoleBox.Text = snapshot;
         consoleBox.SelectionStart = consoleBox.TextLength;
         consoleBox.ScrollToCaret();
     }
@@ -569,6 +432,7 @@ public partial class Form1 : Form
         if (!double.TryParse(frequencyBox.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out var mhz)) { MessageBox.Show("Invalid frequency."); return; }
         ResetAudioButton();
         connectButton.Enabled = false;
+        ShowConnectionProgress(5, "Finding receiver...");
         try
         {
             var frequency = mhz * 1_000_000;
@@ -579,17 +443,27 @@ public partial class Form1 : Form
             if (protocol == "Auto") protocol = IsTwenteWebSdr(receiverUrl) ? "WebSDR" : await ReceiverProtocols.DetectAsync(receiverUrl);
             if (protocol is "OpenWebRX" or "WebSDR")
             {
+                ShowConnectionProgress(35, "Loading receiver waterfall...");
                 await ActivateWebReceiverAsync(receiverUrl, protocol, frequency);
+                ShowConnectionProgress(65, "Waiting for receiver initialization...");
+                var deadline = Environment.TickCount64 + 20000;
+                while (webReceiver is { Ready: false } && Environment.TickCount64 < deadline) await Task.Delay(100);
+                if (webReceiver is { Ready: true }) { ShowConnectionProgress(100, "Receiver ready"); await Task.Delay(250); }
+                else statusLabel.Text = "Receiver still loading. Check the receiver panel for a profile or error.";
                 return;
             }
             currentServerUrl = NormalizeServerUrl(urlBox.Text);
             currentServerAntenna = "Not reported";
+            ShowConnectionProgress(25, "Opening receiver channels...");
             await client.ConnectAsync(urlBox.Text, frequency, modeBox.Text.ToLowerInvariant(), (int)bandwidthBox.Value);
+            ShowConnectionProgress(85, "Starting audio...");
             PreselectBandForFrequency(frequency);
             waterfall.SetRadioState(frequency, 30_000_000d / (1 << 11), frequency, (int)bandwidthBox.Value);
             ApplyWaterfallRange();
             StartReceiverAudio();
             connectButton.Text = "Disconnect";
+            ShowConnectionProgress(100, "Receiver ready");
+            await Task.Delay(250);
         }
         catch (Exception ex)
         {
@@ -598,7 +472,7 @@ public partial class Form1 : Form
             ResetAudioButton();
             MessageBox.Show(this, GetFriendlyConnectionError(ex), "Receiver unavailable", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
-        finally { connectButton.Enabled = true; }
+        finally { connectButton.Enabled = true; HideConnectionProgress(); }
     }
 
     private async Task ActivateWebReceiverAsync(string receiverUrl, string protocol, double frequencyHz)
@@ -633,7 +507,7 @@ public partial class Form1 : Form
         recordWaterfallCheckBox.Enabled = false;
         bandBox.Enabled = false;
         wfMinBox.Enabled = wfMaxBox.Enabled = false;
-        if (navigationBar is not null) navigationBar.Enabled = false;
+        zoomBar.Enabled = false;
         serverInfoBox.Text = currentServerTitle + "\n" + receiverUrl + "\nSelect bands/profiles and advanced modes in the receiver panel.\nNative recording is unavailable for web receivers.";
         UpdateFavoriteButton();
         try { await receiver.InitializeAsync(); StartReceiverAudio(); }
@@ -654,7 +528,7 @@ public partial class Form1 : Form
         connectButton.Text = "Connect";
         bandBox.Enabled = true;
         wfMinBox.Enabled = wfMaxBox.Enabled = true;
-        if (navigationBar is not null) navigationBar.Enabled = true;
+        zoomBar.Enabled = true;
         recordButton.Enabled = true;
         recordWaterfallCheckBox.Enabled = true;
         ResetAudioButton();
@@ -857,8 +731,8 @@ public partial class Form1 : Form
 
     private void ResetRecordingButton()
     {
-        recordButton.Text = "â— Record";
-        recordButton.BackColor = Color.FromArgb(65, 70, 75);
+        recordButton.Text = "Record";
+        recordButton.BackColor = Color.FromArgb(30, 125, 70);
         recordWaterfallCheckBox.Enabled = true;
     }
 
@@ -885,7 +759,12 @@ public partial class Form1 : Form
     private MenuStrip BuildMenuStrip()
     {
         var menu = new MenuStrip { BackColor = Color.FromArgb(45, 52, 58), ForeColor = Color.White };
-        var file = new ToolStripMenuItem("File");
+        var file = new ToolStripMenuItem("Receiver");
+        file.DropDownItems.Add("Startup preferences...", null, (_, _) => OpenStartupSettings());
+        var protocols = new ToolStripMenuItem("Protocol");
+        foreach (var name in ReceiverProtocols.Names) { var item = new ToolStripMenuItem(name) { Checked = name == "Auto" }; item.Click += (_, _) => { protocolBox.SelectedItem = name; foreach (ToolStripMenuItem other in protocols.DropDownItems) other.Checked = other == item; }; protocols.DropDownItems.Add(item); }
+        protocols.DropDownOpening += (_, _) => { foreach (ToolStripMenuItem item in protocols.DropDownItems) item.Checked = item.Text == protocolBox.Text; };
+        file.DropDownItems.Add(protocols);
         file.DropDownItems.Add("Exit", null, (_, _) => Close());
         var bookmarks = new ToolStripMenuItem("Bookmarks");
         bookmarks.DropDownItems.Add(favoritesMenu);
@@ -895,8 +774,12 @@ public partial class Form1 : Form
         bookmarks.DropDownItems.Add("Export Favorites...", null, (_, _) => ExportData(false));
         bookmarks.DropDownItems.Add("Import Bookmarks...", null, (_, _) => ImportData(true));
         bookmarks.DropDownItems.Add("Export Bookmarks...", null, (_, _) => ExportData(true));
-        var settings = new ToolStripMenuItem("Settings");
-        settings.DropDownItems.Add("Startup", null, (_, _) => OpenStartupSettings());
+        var settings = new ToolStripMenuItem("View");
+        settings.DropDownItems.Add("Community Chat", null, async (_, _) => { ShowSidebar("chat"); await communityChat.ActivateAsync(); });
+        settings.DropDownItems.Add("Detach chat", null, (_, _) => DetachChat());
+        settings.DropDownItems.Add("Server details", null, (_, _) => ShowSidebar("details"));
+        settings.DropDownItems.Add("Console Log", null, (_, _) => OpenConsoleWindow());
+        settings.DropDownItems.Add("Display settings", null, (_, _) => OpenDisplaySettings());
         var help = new ToolStripMenuItem("Help");
         var updates = new ToolStripMenuItem("Check for Updates...");
         updates.Click += async (_, _) => await CheckForUpdates(updates);
@@ -1151,7 +1034,7 @@ public partial class Form1 : Form
     {
         var normalizedUrl = Uri.TryCreate(urlBox.Text.Trim(), UriKind.Absolute, out var uri) ? uri.ToString().TrimEnd('/') : "";
         var isFavorite = normalizedUrl.Length > 0 && LoadFavorites().Any(item => item.Url.Equals(normalizedUrl, StringComparison.OrdinalIgnoreCase));
-        favoriteButton.Text = isFavorite ? "★" : "☆";
+        favoriteButton.Text = ""; favoriteButton.Active = isFavorite; favoriteButton.Invalidate();
         favoriteButton.BackColor = Color.FromArgb(35, 42, 48);
         favoriteToolTip.SetToolTip(favoriteButton, isFavorite ? "Remove this server from Favorites" : "Add this server to Favorites");
     }
@@ -1171,6 +1054,7 @@ public partial class Form1 : Form
         try
         {
             connectButton.Enabled = false;
+        ShowConnectionProgress(5, "Finding receiver...");
             client.StopAudio();
             ResetAudioButton();
             await CancelWaterfallRecordingAsync();

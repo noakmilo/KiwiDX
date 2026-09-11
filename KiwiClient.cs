@@ -46,6 +46,7 @@ public sealed class KiwiClient : IAsyncDisposable
     private static readonly int[] AdpcmSteps = { 7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 19, 21, 23, 25, 28, 31, 34, 37, 41, 45, 50, 55, 60, 66, 73, 80, 88, 97, 107, 118, 130, 143, 157, 173, 190, 209, 230, 253, 279, 307, 337, 371, 408, 449, 494, 544, 598, 658, 724, 796, 876, 963, 1060, 1166, 1282, 1411, 1552, 1707, 1878, 2066, 2272, 2499, 2749, 3024, 3327, 3660, 4026, 4428, 4871, 5358, 5894, 6484, 7132, 7845, 8630, 9493, 10442, 11487, 12635, 13899, 15289, 16818, 18500, 20350, 22385, 24623, 27086, 29794, 32767 };
     public bool IsConnected => audioSocket?.State == WebSocketState.Open;
     public bool IsRecording { get { lock (recordingSync) return recordingWriter is not null; } }
+    public event EventHandler<(int Percent, string Stage)>? ConnectionProgress;
     public event EventHandler<byte[]>? WaterfallLine;
     public event EventHandler<string>? StatusChanged;
     public event EventHandler<string>? Error;
@@ -101,9 +102,13 @@ public sealed class KiwiClient : IAsyncDisposable
                 throw new TimeoutException("Receiver temporarily unavailable: the connection timed out.");
             }
         }
+        ConnectionProgress?.Invoke(this, (45, "Authenticating receiver..."));
         _ = LoadServerInfoAsync(baseUri);
-        _ = ReceiveLoop(waterfallSocket, true, cancellation.Token);
-        _ = ReceiveLoop(audioSocket, false, cancellation.Token);
+        var receiveToken = cancellation.Token;
+        var receiveWaterfall = waterfallSocket;
+        var receiveAudio = audioSocket;
+        _ = Task.Run(() => ReceiveLoop(receiveWaterfall, true, receiveToken));
+        _ = Task.Run(() => ReceiveLoop(receiveAudio, false, receiveToken));
         await SendAsync(audioSocket, audioSendLock, "SET auth t=kiwi p=");
         await SendAsync(waterfallSocket, waterfallSendLock, "SET auth t=kiwi p=");
         await SendTuningAsync();
@@ -114,12 +119,14 @@ public sealed class KiwiClient : IAsyncDisposable
         audioOutput.Init(audioBuffer);
         audioOutput.Pause();
         await ConfigureWaterfallAsync(11, frequency);
+        ConnectionProgress?.Invoke(this, (65, "Waiting for audio and waterfall..."));
         var ready = Task.WhenAll(audioReady.Task, waterfallReady.Task);
         var timeout = Task.Delay(TimeSpan.FromSeconds(12), cancellation.Token);
         var completed = await Task.WhenAny(ready, connectionRejected.Task, timeout);
         if (completed == connectionRejected.Task) throw new InvalidOperationException(await connectionRejected.Task);
         if (completed == timeout) throw new TimeoutException("Receiver temporarily unavailable: it did not confirm the audio and waterfall channels.");
         await ready;
+        ConnectionProgress?.Invoke(this, (80, "Preparing audio buffer..."));
         connectionEstablished = true;
         var now = DateTime.UtcNow.Ticks;
         Interlocked.Exchange(ref lastAudioDataTicks, now);
@@ -249,7 +256,8 @@ public sealed class KiwiClient : IAsyncDisposable
             while (!token.IsCancellationRequested && socket.State == WebSocketState.Open)
             {
                 using var stream = new MemoryStream(); WebSocketReceiveResult result;
-                do { result = await socket.ReceiveAsync(buffer, token); stream.Write(buffer, 0, result.Count); } while (!result.EndOfMessage);
+                do { result = await socket.ReceiveAsync(buffer, token).ConfigureAwait(false); if (result.MessageType == WebSocketMessageType.Close) break; stream.Write(buffer, 0, result.Count); } while (!result.EndOfMessage);
+                if (result.MessageType == WebSocketMessageType.Close) break;
                 var packet = stream.ToArray();
                 if (waterfall) { waterfallPackets++; waterfallBytes += packet.Length; }
                 else { audioPackets++; audioBytes += packet.Length; }
@@ -283,7 +291,7 @@ public sealed class KiwiClient : IAsyncDisposable
                 {
                     Interlocked.Exchange(ref lastWaterfallDataTicks, DateTime.UtcNow.Ticks);
                     WaterfallLine?.Invoke(this, packet[16..]);
-                    Log?.Invoke(this, $"WF line received: {packet.Length - 16} bytes");
+                    if (waterfallPackets <= 5 || waterfallPackets % 50 == 0) Log?.Invoke(this, $"WF line received: {packet.Length - 16} bytes");
                 }
                 else if (!waterfall && firstChars == "SND" && packet.Length > 10)
                 {
@@ -298,14 +306,14 @@ public sealed class KiwiClient : IAsyncDisposable
                             var pcm = DecodeAdpcm(packet, start + 10, sampleBytes);
                             audioBuffer?.AddSamples(pcm, 0, pcm.Length);
                             CaptureRecordingAudio(pcm);
-                            Log?.Invoke(this, $"ADPCM audio decoded: {pcm.Length} PCM bytes, buffer {audioBuffer?.BufferedBytes ?? 0} bytes");
+                            if (audioPackets <= 5 || audioPackets % 50 == 0) Log?.Invoke(this, $"ADPCM audio decoded: {pcm.Length} PCM bytes, buffer {audioBuffer?.BufferedBytes ?? 0} bytes");
                         }
                         else
                         {
                             var pcm = ToLittleEndianPcm(packet, start + 10, sampleBytes, (flags & 0x80) != 0);
                             audioBuffer?.AddSamples(pcm, 0, pcm.Length);
                             CaptureRecordingAudio(pcm);
-                            Log?.Invoke(this, $"Audio PCM: {pcm.Length} bytes, buffer {audioBuffer?.BufferedBytes ?? 0} bytes");
+                            if (audioPackets <= 5 || audioPackets % 50 == 0) Log?.Invoke(this, $"Audio PCM: {pcm.Length} bytes, buffer {audioBuffer?.BufferedBytes ?? 0} bytes");
                         }
                     }
                 }
@@ -477,6 +485,12 @@ public sealed class KiwiClient : IAsyncDisposable
     }
 
     public async Task DisconnectAsync() { connectionEstablished = false; Interlocked.Exchange(ref audioPlaybackRequested, 0); CancelRecording(); cancellation?.Cancel(); statsTimer?.Dispose(); statsTimer = null; keepAliveTimer?.Dispose(); keepAliveTimer = null; watchdogTimer?.Dispose(); watchdogTimer = null; audioOutput?.Stop(); audioOutput?.Dispose(); audioOutput = null; audioBuffer = null; if (audioSocket is not null) await Close(audioSocket); if (waterfallSocket is not null) await Close(waterfallSocket); audioSocket = null; waterfallSocket = null; StatusChanged?.Invoke(this, "Disconnected"); }
-    private static async Task Close(ClientWebSocket socket) { if (socket.State == WebSocketState.Open) await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "close", CancellationToken.None); socket.Dispose(); }
+    private static async Task Close(ClientWebSocket socket)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        try { if (socket.State == WebSocketState.Open) await socket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "close", timeout.Token).ConfigureAwait(false); }
+        catch (Exception ex) when (ex is OperationCanceledException or WebSocketException) { socket.Abort(); }
+        finally { socket.Dispose(); }
+    }
     public async ValueTask DisposeAsync() { await DisconnectAsync(); cancellation?.Dispose(); audioSendLock.Dispose(); waterfallSendLock.Dispose(); }
 }

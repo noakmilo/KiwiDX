@@ -1,9 +1,23 @@
+## v0.2.0 - 2026-09-11
+
+- Keep bounded console history in memory and update the native log control only when visible; truncate oversized diagnostics.
+- Show a centered animated connection indicator with stage percentages.
+
+- Add the waterfall-focused workspace with a detachable native chat sidebar.
+- Safely reactivate detached chat, console and display windows, including minimized windows.
+- Receive audio and waterfall off the UI thread, cap display refreshes and sample packet diagnostics to prevent UI queue overload.
+- Show only waterfall and its controls in Twente/OpenWebRX; retain OpenWebRX profile selection and receiver error/start overlays.
+- Bound receiver socket shutdown and restore the original application and installer icon.
+
+## v0.1.53 - 2026-09-10
+
+- Start maximized with three control rows: receiver settings, volume/recording, and compact panel switches with solid backgrounds.
+- Preserve receiver height when showing optional panels; grow restored windows where possible and scroll when screen space runs out.
+- Use the Community Driven SDR Listener slogan, automatic receiver audio, Mute beside Volume, and a green Record control.
+- Add native Community Chat with nick controls, simultaneous #hamradio/#shortwave tabs, private /help and registration/login commands, and clickable RX/frequency/mode links.
+
 ## v0.1.52 - 2026-09-09
 
-- Added private /help and /register chat commands; verified credentials, errors and help never reach other clients or channel history.
-- Window slogan is now Community Driven SDR Listener; audio starts on connection with Mute beside Volume.
-- Added optional Community Chat below Console Log with #hamradio/#shortwave tabs and clickable receiver/frequency/mode sharing.
-- Included a Python chat service with registered nicks, persistent history, invisible Turnstile verification and a DigitalOcean deployment guide.
 - Fixed automatic protocol detection: KiwiSDR uses the native client even when its description mentions OpenWebRX; changing URLs resets the previous protocol selection.
 - Added embedded OpenWebRX and general WebSDR receivers, automatic/manual protocol selection, and protocol-aware favorites.
 - Server URL is now an editable favorites dropdown; receiver state is synchronized for logging.

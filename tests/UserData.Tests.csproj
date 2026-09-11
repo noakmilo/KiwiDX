@@ -4,6 +4,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
-  <ItemGroup><Compile Remove="WebReceivers/**/*.cs" /><Compile Include="../UserData.cs" Link="UserData.cs" /><Compile Include="../ListeningLog.cs" Link="ListeningLog.cs" /></ItemGroup>
+  <ItemGroup><Compile Include="Program.cs" /><Compile Include="../UserData.cs" Link="UserData.cs" /><Compile Include="../ListeningLog.cs" Link="ListeningLog.cs" /></ItemGroup>
 </Project>

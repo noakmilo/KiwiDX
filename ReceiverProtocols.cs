@@ -1,7 +1,7 @@
 using System.Runtime.InteropServices;
 namespace KiwiDX;
 
-internal sealed class FavoriteServerBox : ComboBox
+internal sealed class FavoriteServerBox : RadioComboBox
 {
     public FavoriteServerBox()
     {

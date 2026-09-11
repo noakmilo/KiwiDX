@@ -1,5 +1,8 @@
 # KiwiDX v0.1.52
 
+- Start maximized; panel switches have a separate row and preserve receiver height with scrolling when screen space runs out.
+- Community Chat connects automatically to its configured service with no URL input; green bold heading and restored green Record control.
+
 - Window slogan: Community Driven SDR Listener. Audio starts on connection; Mute replaces Play beside Volume.
 - Optional Community Chat with #hamradio/#shortwave tabs, guest nicks, registration/login and Paste RX-Freq tuning links.
 - Python chat service with SQLite persistence, invisible Turnstile verification and systemd/Nginx deployment files. Follow community-chat/DEPLOY_ES.md to configure hosting and CAPTCHA keys.

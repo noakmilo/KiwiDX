@@ -2,11 +2,11 @@
 
 El servidor es un chat estilo IRC sobre HTTPS/WebSocket, no un servidor compatible con clientes IRC tradicionales. Un proceso Python atiende simultáneamente #hamradio y #shortwave. SQLite conserva los nicks registrados y los últimos 500 mensajes por canal; cada conexión recibe los últimos 100. Las sesiones de login terminan al desconectar. systemd mantiene el servicio activo y lo inicia después de reiniciar el droplet.
 
-Necesitas un droplet Ubuntu 24.04 LTS, acceso SSH con sudo y un dominio/subdominio. Sustituye `chat.example.com`, `IP_DEL_DROPLET` y `TU_USUARIO` en los ejemplos. El despliegue no se realiza desde KiwiDX: estos archivos se entregan para que los instales en tu servidor.
+Necesitas un droplet Ubuntu 24.04 LTS, acceso SSH con sudo y un dominio/subdominio. Sustituye `kiwidx.noakmilo.com`, `IP_DEL_DROPLET` y `TU_USUARIO` en los ejemplos. El despliegue no se realiza desde KiwiDX: estos archivos se entregan para que los instales en tu servidor.
 
 ## 1. DNS y firewall
 
-Crea un registro A para `chat.example.com` apuntando a la IPv4 del droplet. Si usas Cloudflare DNS, déjalo en **DNS only** (nube gris) con esta configuración: así Nginx recibe la IP real y los límites no agrupan a todos los usuarios detrás de una IP de Cloudflare. Turnstile funciona sin activar el proxy de Cloudflare. No crees un AAAA si no tienes IPv6 correctamente configurado.
+Crea un registro A para `kiwidx.noakmilo.com` apuntando a la IPv4 del droplet. Si usas Cloudflare DNS, déjalo en **DNS only** (nube gris) con esta configuración: así Nginx recibe la IP real y los límites no agrupan a todos los usuarios detrás de una IP de Cloudflare. Turnstile funciona sin activar el proxy de Cloudflare. No crees un AAAA si no tienes IPv6 correctamente configurado.
 
 Permite TCP 22 desde tu IP de administración, y TCP 80/443 desde Internet en el firewall de DigitalOcean. No abras 8080. En Ubuntu, si usas UFW:
 
@@ -21,7 +21,7 @@ Mantén tu sesión SSH abierta al comprobar el firewall.
 
 ## 2. Crear el CAPTCHA invisible
 
-En el panel de Cloudflare, abre **Turnstile > Add widget**. Dale un nombre como `KiwiDX Community Chat`, agrega **solamente** el hostname `chat.example.com` y elige **Invisible** como modo. Guarda y copia:
+En el panel de Cloudflare, abre **Turnstile > Add widget**. Dale un nombre como `KiwiDX Community Chat`, agrega **solamente** el hostname `kiwidx.noakmilo.com` y elige **Invisible** como modo. Guarda y copia:
 
 - **Site key:** pública; la página de chat la obtiene de `/config`.
 - **Secret key:** privada; se guarda únicamente en el archivo de entorno del droplet.
@@ -61,7 +61,7 @@ sudo nano /etc/kiwidx-chat.env
 Contenido, usando tus claves reales (sin espacios alrededor del signo igual):
 
 ```dotenv
-CHAT_ORIGIN=https://chat.example.com
+CHAT_ORIGIN=https://kiwidx.noakmilo.com
 TURNSTILE_SITEKEY=TU_SITE_KEY
 TURNSTILE_SECRET=TU_SECRET_KEY
 CHAT_DB=/var/lib/kiwidx-chat/chat.sqlite3
@@ -89,29 +89,27 @@ sudo install -m 644 /opt/kiwidx-chat/deploy/nginx.conf /etc/nginx/sites-availabl
 sudo nano /etc/nginx/sites-available/kiwidx-chat
 ```
 
-Cambia `server_name chat.example.com;` por tu hostname. Después:
+Cambia `server_name kiwidx.noakmilo.com;` por tu hostname. Después:
 
 ```bash
 sudo ln -s /etc/nginx/sites-available/kiwidx-chat /etc/nginx/sites-enabled/kiwidx-chat
 sudo nginx -t
 sudo systemctl reload nginx
-sudo certbot --nginx -d chat.example.com --redirect
+sudo certbot --nginx -d kiwidx.noakmilo.com --redirect
 sudo certbot renew --dry-run
 ```
 
 Certbot agregará TLS y redirección de HTTP a HTTPS. Aunque la página pueda cargar por HTTP antes de este paso, el chat requiere HTTPS y no debe probarse como servicio público hasta terminar el certificado. Si configuras otro proxy delante de Nginx, revisa primero la restauración segura de IP real; no confíes en cabeceras X-Real-IP suministradas directamente por Internet.
 
-## 7. Usarlo en KiwiDX
+## 7. Usarlo en KiwiDX (cliente nativo)
 
-1. Marca **Community Chat** en la barra superior. El panel aparece debajo de Console Log.
-2. Introduce `https://chat.example.com` en el panel y pulsa **Open chat**. KiwiDX recuerda esta URL; no almacena la contraseña.
-3. Elige el nick temporal o conserva el ANON aleatorio y pulsa **Connect**. Turnstile verifica la conexión de forma invisible.
-4. Cambia entre las pestañas **#hamradio** y **#shortwave**: ambas permanecen conectadas.
-5. Para registrar un nick escribe `/register MiNick UnaClaveLargaDe12OMasCaracteres` (tambien se admite `/nick register MiNick UnaClaveLargaDe12OMasCaracteres`). Luego `/login MiNick UnaClaveLargaDe12OMasCaracteres`.
-6. Los nicks tienen 3–24 caracteres y comienzan con letra. Se permiten letras ASCII, números, guion y guion bajo. Las contraseñas tienen 12–128 caracteres sin espacios. Las órdenes de contraseña se ocultan mientras se escriben, no se difunden ni se guardan en el historial. Usa una contraseña única para este servicio.
-7. **Set nick** cambia el nick temporal mediante `/nick nuevoNick`. Un nick registrado requiere login. Si se desconecta la sesión, vuelve a iniciar sesión; no hay recuperación automática por correo.
-8. Con un receptor conectado, pulsa **Paste RX-Freq**. Revisa el texto del cuadro y pulsa **Send**. Los demás usuarios de KiwiDX pueden hacer clic en el enlace para cambiar al servidor, frecuencia y modo compartidos. Esto desconecta su receptor anterior. El botón no envía automáticamente.
-9. Desmarca **Community Chat** para ocultarlo; la conexión de chat continúa mientras KiwiDX esté abierto. Pulsa **Disconnect** en el chat para salir.
+1. Instala el KiwiDX actualizado y abre **Chat**. Conecta automaticamente al servicio configurado, sin mostrar su URL.
+2. Turnstile se ejecuta en un componente temporal de verificacion; al terminar, este se destruye. El chat, sus mensajes y las credenciales no pasan por una pagina web: .NET abre `/session` por HTTPS y `/ws` por WebSocket seguro directamente.
+3. El nick invitado aparece como ANON aleatorio. Usa **Set nick** para cambiarlo o `/register MiNick UnaClaveLargaDe12OMasCaracteres` y despues `/login MiNick UnaClaveLargaDe12OMasCaracteres`.
+4. Las pestanas nativas **#hamradio** y **#shortwave** reciben mensajes simultaneamente. Un asterisco indica actividad en el canal no seleccionado.
+5. `/help`, las respuestas de autenticacion y los errores son privados. No se hace eco local de los comandos y las contrasenas se ocultan en el cuadro de entrada. Las sesiones terminan al desconectar.
+6. **Paste RX-Freq** prepara el servidor, frecuencia y modo actuales. **Send** publica el mensaje. El enlace subrayado permite sintonizar desde KiwiDX.
+7. El boton **Chat** oculta el panel y mantiene la sesion. **View > Detach chat** lo abre en una ventana independiente. **Disconnect** cierra la conexion; **Reconnect** realiza una nueva verificacion. Ante errores de CAPTCHA, revisa las claves y vuelve a intentar.
 
 ## 8. Verificación, actualización y respaldo
 
@@ -143,3 +141,24 @@ Referencias oficiales: [Turnstile invisible](https://developers.cloudflare.com/t
 Escribe `/help` para ver los comandos disponibles. La ayuda, las respuestas de registro/login y los errores se envian exclusivamente a tu conexion: no se publican en ninguno de los canales ni se guardan en su historial. Todo mensaje que comienza con `/` se procesa como comando privado, incluso si es desconocido o tiene argumentos incorrectos. `/register`, `/login` y `/nick register` ocultan el texto mientras se escribe; los nombres de comandos admiten mayusculas y minusculas.
 
 Para aplicar esta actualizacion a un droplet existente, copia `server.py` y la carpeta `static` a `/opt/kiwidx-chat/`, conservando el entorno y la base de datos, y ejecuta `sudo systemctl restart kiwidx-chat`. Vuelve a abrir la pagina del chat en KiwiDX. No hace falta reinstalar KiwiDX.
+
+El cliente nativo requiere instalar el nuevo KiwiDX y subir `static/verify.html` y `static/verify.js` al servidor. El servidor sigue validando CAPTCHA antes de admitir cada conexion.
+
+## Actualizar el servidor para el cliente nativo
+
+El servicio Python conserva los mismos endpoints y base de datos. Agrega los dos archivos de verificacion antes de instalar el nuevo cliente. Desde PowerShell en el proyecto:
+
+```powershell
+scp .\community-chat\static\verify.html .\community-chat\static\verify.js TU_USUARIO@IP_DEL_DROPLET:~/
+```
+
+En el droplet:
+
+```bash
+sudo install -m 644 ~/verify.html /opt/kiwidx-chat/static/verify.html
+sudo install -m 644 ~/verify.js /opt/kiwidx-chat/static/verify.js
+```
+
+El servidor publica esos archivos automaticamente mediante `/static/`; no hace falta reiniciar ni modificar las cuentas o las claves de Turnstile. La pagina principal de chat web puede seguir disponible para navegadores, pero KiwiDX ya no la carga. La validacion real con Turnstile debe probarse desde KiwiDX despues de subir estos archivos; las pruebas automatizadas usan una respuesta de CAPTCHA simulada y una conexion local HTTP, sin modificar la verificacion HTTPS de produccion.
+
+En v0.2.0 el chat ocupa el lateral derecho y conserva el mismo servicio y los mismos archivos de CAPTCHA. Si verify.html y verify.js ya estan desplegados, este redise?o no requiere actualizar el droplet.

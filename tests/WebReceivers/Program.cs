@@ -1,4 +1,4 @@
-﻿using KiwiDX;
+using KiwiDX;
 using System.Reflection;
 using System.Text.Json;
 using Microsoft.Web.WebView2.WinForms;
@@ -53,6 +53,10 @@ internal static class Program
                     if (view.CoreWebView2 is null) throw new InvalidOperationException("WebView2 browser process exited during integration testing.");
                     Console.WriteLine($"Ready={receiver.Ready} freq={receiver.FrequencyHz} mode={receiver.Mode}");
                     Check(receiver.Ready && receiver.Mode == "USB" && receiver.FrequencyHz == 7110000, protocol + " initial tuning and state");
+                    var layout = await view.ExecuteScriptAsync("['duplicate','native-duplicate'].every(id=>getComputedStyle(document.getElementById(id)).display==='none') && document.getElementById('test-waterfall').getClientRects().length>0");
+                    Check(layout == "true", protocol + " hides duplicate UI and keeps waterfall visible");
+                    var selector = protocol == "OpenWebRX" ? "#openwebrx-waterfall-color-min" : "#wf-brightness";
+                    Check(await view.ExecuteScriptAsync($"document.querySelector('{selector}').getClientRects().length>0") == "true", protocol + " waterfall controls remain visible");
                     receiver.SetBandwidth(2200);
                     await Task.Delay(100); await receiver.ReadStateAsync();
                     Check(receiver.Bandwidth == 2200, protocol + " bandwidth command");

@@ -26,3 +26,6 @@ for(const button of document.querySelectorAll('[data-channel]'))button.onclick=(
 byId('pasteRx').onclick=()=>{if(window.chrome?.webview)window.chrome.webview.postMessage({type:'pasteRx'});else notice('Paste RX-Freq is available inside KiwiDX.');};
 window.setRxDraft=text=>{byId('message').type='text';byId('message').value=text;byId('message').focus();};
 window.addEventListener('pagehide',()=>socket?.close());
+
+window.connectCommunityChat=()=>{if(!connected()&&!working)connect();};
+window.addEventListener("load",()=>{if(window.chrome?.webview)window.connectCommunityChat();});

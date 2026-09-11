@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Text.Json;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
@@ -80,6 +80,7 @@ internal sealed class WebReceiverControl : UserControl
         var generation = navigation;
         try
         {
+            await Script(WaterfallLayoutScript(protocol));
             var json = await Script(protocol == "OpenWebRX" ? """
                 if(typeof getDemodulators!=='function')return null;
                 const d=getDemodulators()[0]; if(!d)return null;
@@ -101,13 +102,48 @@ internal sealed class WebReceiverControl : UserControl
             {
                 initialized = true;
                 SetFrequency(initialFrequency); SetMode(initialMode); Play();
-                StatusChanged?.Invoke(this, "Connected to " + protocol + ". Use the receiver panel for bands, profiles and advanced modes.");
+                StatusChanged?.Invoke(this, "Connected to " + protocol + ". Tune using KiwiDX; waterfall controls remain in the receiver panel.");
                 return;
             }
             StateChanged?.Invoke(this, EventArgs.Empty);
         }
         catch (JsonException) { Ready = false; }
     }
+    // Keep the original DOM and event handlers: the native controls still call the receiver APIs.
+    internal static string WaterfallLayoutScript(string protocol) => "const openRx=" + (protocol == "OpenWebRX" ? "true;" : "false;") + """
+        const surface=document.querySelector(openRx?'.openwebrx-waterfall-container':'#wfccontainer');
+        if(!surface)return false;
+        const roots=openRx
+          ? [...document.querySelectorAll('#openwebrx-frequency-container,#webrx-canvas-background,#openwebrx-error-overlay,#openwebrx-autoplay-overlay,#openwebrx-sdr-profiles-listbox,[id^="openwebrx-waterfall-color"],.openwebrx-zoom-button')]
+          : [surface,...document.querySelectorAll('#audiostartbutton,.warning'),
+             ...[...document.querySelectorAll('[onchange*="waterfall"],[onclick*="wfset"],#wfwidecheckbox,#wf-brightness')].map(e=>e.closest('.ctl')).filter(Boolean)];
+        if(openRx && !document.querySelector('#webrx-canvas-background'))return false;
+        const paths=new Set();
+        for(const root of roots)for(let node=root;node;node=node.parentElement)paths.add(node);
+        function trim(parent){
+          for(const child of parent.children){
+            if(child.matches('script,style,link'))continue;
+            const keep=paths.has(child);
+            child.classList.toggle('kiwidx-hidden',!keep);
+            if(keep && !roots.includes(child))trim(child);
+          }
+        }
+        trim(document.body);
+        if(!document.getElementById('kiwidx-waterfall-layout')){
+          const style=document.createElement('style');style.id='kiwidx-waterfall-layout';
+          style.textContent=`.kiwidx-hidden{display:none!important}
+            html,body{margin:0!important;padding:0!important;background:#0e1821!important;color:#e4edf6!important}
+            #webrx-page-container,.openwebrx-waterfall-container{top:0!important;margin:0!important;height:100vh!important}
+            #openwebrx-panel-receiver{width:259px!important}
+            .mainspan{margin:0!important;padding:0!important;width:100%!important}
+            .tabs{margin-top:8px!important}.tabs>.tab:not(.kiwidx-hidden){display:block!important;position:relative!important}
+            .ctl{background:#15222e!important;color:#e4edf6!important}
+            #wfccontainer{margin:0!important}`;
+          document.head.append(style);window.dispatchEvent(new Event('resize'));
+        }
+        return true;
+        """;
+
     private static string Num(double v) => v.ToString("0.###", CultureInfo.InvariantCulture);
     public void SetFrequency(double hz)
     {

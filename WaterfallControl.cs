@@ -25,6 +25,9 @@ public sealed class WaterfallControl : Control
     private int minimumDb = -150;
     private int maximumDb = -50;
     private long receivedLines;
+    public bool ShowBandLabels { get; set; }
+    private byte[] latestSpectrum = Array.Empty<byte>();
+    private int SpectrumHeight => Math.Clamp(ClientSize.Height / 4, 90, 180);
     private IReadOnlyList<FrequencyBookmark> bookmarks = Array.Empty<FrequencyBookmark>();
     private readonly List<(RectangleF Bounds, FrequencyBookmark Bookmark)> bookmarkHits = new();
     private readonly ToolTip bookmarkToolTip = new();
@@ -111,6 +114,7 @@ public sealed class WaterfallControl : Control
         receivedLines++;
         lock (sync)
         {
+            latestSpectrum = (byte[])line.Clone();
             Array.Copy(pixels, 0, pixels, BitmapWidth, pixels.Length - BitmapWidth);
             const int row = 0;
             for (var x = 0; x < BitmapWidth; x++)
@@ -124,20 +128,35 @@ public sealed class WaterfallControl : Control
 
     protected override void OnPaint(PaintEventArgs e)
     {
-        lock (sync) e.Graphics.DrawImage(bitmap, ClientRectangle);
+        int top = SpectrumHeight;
+        e.Graphics.Clear(Color.FromArgb(8,17,25));
+        lock (sync) e.Graphics.DrawImage(bitmap,new Rectangle(0,top+24,ClientSize.Width,Math.Max(1,ClientSize.Height-top-24)));
         DrawBandMap(e.Graphics);
-        DrawFrequencyScale(e.Graphics);
+        DrawSpectrum(e.Graphics);
+        var state=e.Graphics.Save();e.Graphics.TranslateTransform(0,top);DrawFrequencyScale(e.Graphics);e.Graphics.Restore(state);
         DrawBookmarks(e.Graphics);
         using var font = new Font(Font.FontFamily, 9);
-        var zoomText = $"Z{zoomLevel}  •  span {span / 1_000:0.###} kHz";
-        var zoomSize = e.Graphics.MeasureString(zoomText, font);
-        e.Graphics.DrawString(zoomText, font, Brushes.Gold, Math.Max(8, (ClientSize.Width - zoomSize.Width) / 2), 27);
         if (receivedLines == 0)
         {
             const string message = "Waiting for waterfall data...";
             var size = e.Graphics.MeasureString(message, font);
             e.Graphics.DrawString(message, font, Brushes.LightGray, (ClientSize.Width - size.Width) / 2, (ClientSize.Height - size.Height) / 2);
         }
+    }
+
+    private void DrawSpectrum(Graphics g)
+    {
+        int height=SpectrumHeight;
+        using(var background=new SolidBrush(Color.FromArgb(10,21,30)))g.FillRectangle(background,0,0,Width,height);
+        using var grid=new Pen(Color.FromArgb(29,44,56));using var labels=new SolidBrush(Color.FromArgb(178,195,208));
+        for(int i=1;i<5;i++){float y=i*height/5f;g.DrawLine(grid,0,y,Width,y);g.DrawString($"{maximumDb-(maximumDb-minimumDb)*i/5}",Font,labels,4,y-14);}
+        for(int x=0;x<Width;x+=50)g.DrawLine(grid,x,0,x,height);
+        byte[] samples;lock(sync)samples=latestSpectrum;
+        if(samples.Length>1&&Width>1){var points=new PointF[Width];for(int x=0;x<Width;x++){double db=samples[(int)((long)x*samples.Length/Width)]-255;points[x]=new PointF(x,(float)(height-6-Math.Clamp((db-minimumDb)/(maximumDb-minimumDb),0,1)*(height-12)));}using var trace=new Pen(Color.FromArgb(142,236,143),1);g.DrawLines(trace,points);}
+        float carrier=(float)((tunedFrequency-(centerFrequency-span/2))/span*Width);float band=(float)(passbandWidth/span*Width);
+        using var fill=new SolidBrush(Color.FromArgb(55,95,177,235));g.FillRectangle(fill,carrier-band/2,0,band,height);
+        using var edge=new Pen(Color.FromArgb(110,187,240));g.DrawLine(edge,carrier-band/2,0,carrier-band/2,height);g.DrawLine(edge,carrier+band/2,0,carrier+band/2,height);
+        using var center=new Pen(Color.FromArgb(202,235,255));g.DrawLine(center,carrier,0,carrier,height);
     }
 
     private void OnMouseDown(object? sender, MouseEventArgs e)
@@ -201,7 +220,9 @@ public sealed class WaterfallControl : Control
     {
         var left = centerFrequency - span / 2;
         const int stripHeight = 30;
-        var stripTop = ClientSize.Height - stripHeight;
+        var stripTop = ClientSize.Height - (ShowBandLabels ? stripHeight : 0);
+        if (ShowBandLabels)
+        {
         using (var stripBrush = new SolidBrush(Color.FromArgb(215, 12, 17, 21))) graphics.FillRectangle(stripBrush, 0, stripTop, ClientSize.Width, stripHeight);
         foreach (var band in FrequencyBands)
         {
@@ -219,18 +240,19 @@ public sealed class WaterfallControl : Control
             var labelSize = graphics.MeasureString(band.Label, Font);
             if (width >= labelSize.Width + 4) graphics.DrawString(band.Label, Font, active ? Brushes.Black : Brushes.White, x1 + 2, stripTop + 7);
         }
+        }
         var carrierX = (float)((tunedFrequency - left) / span * ClientSize.Width);
         if (carrierX >= 0 && carrierX <= ClientSize.Width)
         {
-            using var carrierPen = new Pen(Color.Yellow, 2);
+            using var carrierPen = new Pen(Color.FromArgb(175,215,245), 1);
             graphics.DrawLine(carrierPen, carrierX, 24, carrierX, stripTop);
             var dialText = $"{tunedFrequency / 1_000_000:0.000000}";
             var labelX = Math.Clamp(carrierX + 4, 2, Math.Max(2, ClientSize.Width - 82));
-            graphics.DrawString(dialText, Font, Brushes.Yellow, labelX, 28);
+            // Frequency is displayed in the tuning control above the spectrum.
             var passband = Math.Min(span * 0.45, passbandWidth);
             var passbandLeft = (float)((tunedFrequency - passband / 2 - left) / span * ClientSize.Width);
             var passbandRight = (float)((tunedFrequency + passband / 2 - left) / span * ClientSize.Width);
-            using var passbandPen = new Pen(Color.White, 2.5f);
+            using var passbandPen = new Pen(Color.FromArgb(90,140,185), 1f);
             graphics.DrawLine(passbandPen, passbandLeft, 24, passbandLeft, stripTop);
             graphics.DrawLine(passbandPen, passbandRight, 24, passbandRight, stripTop);
         }
@@ -255,13 +277,13 @@ public sealed class WaterfallControl : Control
         {
             var x = (float)((value - leftKhz) / (rightKhz - leftKhz) * ClientSize.Width);
             graphics.DrawLine(linePen, x, 0, x, scaleHeight);
-            var label = value.ToString(stepKhz < 1 ? "0.000" : stepKhz < 10 ? "0.0" : "0");
+            var label = (value / 1000).ToString(stepKhz < 1 ? "0.000000" : stepKhz < 10 ? "0.0000" : "0.000");
             var size = graphics.MeasureString(label, font);
             graphics.DrawString(label, font, Brushes.White, Math.Clamp(x - size.Width / 2, 1, Math.Max(1, ClientSize.Width - size.Width - 1)), 2);
             var minorX = (float)((value + stepKhz / 2 - leftKhz) / (rightKhz - leftKhz) * ClientSize.Width);
             if (minorX >= 0 && minorX <= ClientSize.Width) graphics.DrawLine(minorPen, minorX, scaleHeight - 7, minorX, scaleHeight);
         }
-        graphics.DrawString("kHz", font, Brushes.Gold, 3, scaleHeight - 12);
+        graphics.DrawString("MHz", font, Brushes.LightGray, Math.Max(0,Width-32), scaleHeight-12);
     }
 
     private void DrawBookmarks(Graphics graphics)
@@ -274,7 +296,7 @@ public sealed class WaterfallControl : Control
         {
             var x = (float)((bookmark.FrequencyHz - left) / span * ClientSize.Width);
             var row = visibleIndex++ % 2;
-            var top = 47 + row * 22;
+            var top = SpectrumHeight + 32 + row * 22;
             var size = graphics.MeasureString(bookmark.Name, font);
             var width = Math.Max(28, size.Width + 8);
             var labelX = Math.Clamp(x - width / 2, 1, Math.Max(1, ClientSize.Width - width - 1));
@@ -282,8 +304,8 @@ public sealed class WaterfallControl : Control
             using var fill = new SolidBrush(Color.FromArgb(225, bookmark.Color));
             using var border = new Pen(Color.White, 1);
             using var marker = new Pen(bookmark.Color, 2);
-            graphics.DrawLine(marker, x, 24, x, top);
-            graphics.FillPolygon(fill, new[] { new PointF(x - 5, 24), new PointF(x + 5, 24), new PointF(x, 31) });
+            graphics.DrawLine(marker, x, SpectrumHeight + 24, x, top);
+            graphics.FillPolygon(fill, new[] { new PointF(x - 5, SpectrumHeight + 24), new PointF(x + 5, SpectrumHeight + 24), new PointF(x, SpectrumHeight + 31) });
             graphics.FillRectangle(fill, bounds);
             graphics.DrawRectangle(border, bounds.X, bounds.Y, bounds.Width, bounds.Height);
             var brightness = bookmark.Color.GetBrightness();
@@ -334,18 +356,13 @@ public sealed class WaterfallControl : Control
     private void RaiseViewChanged() => ViewChanged?.Invoke(this, (centerFrequency, span));
     private void BuildPalette()
     {
-        for (var sample = 0; sample < palette.Length; sample++)
+        var stops = new (int At, Color Color)[] { (0,Color.FromArgb(0,3,17)), (50,Color.FromArgb(0,15,86)), (115,Color.FromArgb(0,57,190)), (175,Color.FromArgb(20,188,235)), (218,Color.FromArgb(249,228,45)), (255,Color.FromArgb(255,255,221)) };
+        for (int sample=0;sample<256;sample++)
         {
-            var db = sample - 255;
-            var index = Math.Clamp((int)Math.Round((db - minimumDb) * 255d / (maximumDb - minimumDb)), 0, 255);
-            Color color;
-            if (index < 32) color = Color.FromArgb(0, 0, index * 255 / 31);
-            else if (index < 72) color = Color.FromArgb(0, (index - 32) * 255 / 39, 255);
-            else if (index < 96) color = Color.FromArgb(0, 255, 255 - (index - 72) * 255 / 23);
-            else if (index < 116) color = Color.FromArgb((index - 96) * 255 / 19, 255, 0);
-            else if (index < 184) color = Color.FromArgb(255, 255 - (index - 116) * 255 / 67, 0);
-            else color = Color.FromArgb(255, 0, Math.Min(128, (index - 184) * 128 / 70));
-            palette[sample] = color.ToArgb();
+            double value=Math.Clamp((sample-255-minimumDb)*255d/(maximumDb-minimumDb),0,255);
+            int i=0;while(i<stops.Length-2&&value>stops[i+1].At)i++;
+            var a=stops[i];var b=stops[i+1];double t=(value-a.At)/(b.At-a.At);
+            palette[sample]=Color.FromArgb((int)(a.Color.R+(b.Color.R-a.Color.R)*t),(int)(a.Color.G+(b.Color.G-a.Color.G)*t),(int)(a.Color.B+(b.Color.B-a.Color.B)*t)).ToArgb();
         }
     }
 
