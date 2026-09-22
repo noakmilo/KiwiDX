@@ -4,7 +4,9 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 [xml]$project = Get-Content "$PSScriptRoot\KiwiDX.csproj"
-$version = [string]$project.Project.PropertyGroup.Version
+$version = [string]$project.Project.PropertyGroup.ReleaseVersion
+if (!$version) { $version = [string]$project.Project.PropertyGroup.Version }
+$fileVersion = [string]$project.Project.PropertyGroup.FileVersion
 $dist = Join-Path $PSScriptRoot 'dist'
 # A fresh directory prevents stale executables or local data entering a release.
 $publish = Join-Path $dist ("publish-" + [guid]::NewGuid().ToString('N'))
@@ -15,7 +17,7 @@ dotnet publish "$PSScriptRoot\KiwiDX.csproj" -c Release -r win-x64 --self-contai
 if ($LASTEXITCODE -ne 0) { throw 'dotnet publish failed.' }
 Copy-Item -LiteralPath $FfmpegPath -Destination (Join-Path $publish 'ffmpeg.exe')
 Copy-Item -LiteralPath "$PSScriptRoot\dependences.txt" -Destination $publish
-& $IsccPath "/DAppVersion=$version" "/DPublishDir=$publish" "$PSScriptRoot\installer\KiwiDX.iss"
+& $IsccPath "/DAppVersion=$version" "/DFileVersion=$fileVersion" "/DPublishDir=$publish" "$PSScriptRoot\installer\KiwiDX.iss"
 if ($LASTEXITCODE -ne 0) { throw 'Installer compilation failed.' }
 $zip = Join-Path $dist "KiwiDX_v${version}_Portable_Windows_x64.zip"
 Compress-Archive -Path "$publish\*" -DestinationPath $zip -Force

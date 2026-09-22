@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0-windows</TargetFramework><UseWindowsForms>true</UseWindowsForms><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
-<ItemGroup><Compile Include="../../WebReceiverControl.cs"/><Compile Include="../../ReceiverProtocols.cs"/><Compile Include="../../WorkspaceTheme.cs"/><Compile Include="../../UserData.cs"/><Compile Include="../../ReceiverShare.cs"/><Compile Include="../../StartupSettings.cs"/><PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4191.47"/></ItemGroup>
+<ItemGroup><Compile Include="../../WebReceiverControl.cs"/><Compile Include="../../ReceiverProtocols.cs"/><Compile Include="../../SpyServerAddress.cs"/><Compile Include="../../WorkspaceTheme.cs"/><Compile Include="../../UserData.cs"/><Compile Include="../../ReceiverShare.cs"/><Compile Include="../../StartupSettings.cs"/><Compile Include="../../ManageFavoritesForm.cs"/><PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4191.47"/></ItemGroup>
 <ItemGroup><None Include="fixtures/*.html" CopyToOutputDirectory="PreserveNewest"/></ItemGroup>
 <Target Name="RemoveWpfReference" BeforeTargets="ResolveAssemblyReferences"><ItemGroup><Reference Remove="@(Reference)" Condition="'%(Reference.Filename)' == 'Microsoft.Web.WebView2.Wpf'"/></ItemGroup></Target>
 </Project>

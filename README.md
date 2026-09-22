@@ -26,7 +26,7 @@ The reference image is in `design/kiwidx-v0.2.0-reference.png`. Icons are drawn 
 
 ## Running KiwiDX
 
-Run `KiwiDX_v0.2.0_Setup_x64.exe` from **Releases** to install for your Windows user. Install subsequent Setup releases over the existing installation; uninstalling first is unnecessary. The installer blocks downgrades and preserves user data even on uninstall. Alternatively, extract the Windows x64 ZIP and run `KiwiDX.exe`.
+Run `KiwiDX_v0.2.1_Setup_x64.exe` from **Releases** to install for your Windows user. Install subsequent Setup releases over the existing installation; uninstalling first is unnecessary. The installer blocks downgrades and preserves user data even on uninstall. Alternatively, extract the Windows x64 ZIP and run `KiwiDX.exe`.
 
 The release packages include .NET 8. WebView2 Runtime and Windows Media Foundation are still required. Use **Help > Check for Updates** to compare the installed version with the latest stable GitHub release and open its download page. Updates are checked only when requested; installation is manual.
 

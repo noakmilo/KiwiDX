@@ -12,9 +12,10 @@ public sealed class WaterfallControl : Control
     private readonly int[] palette = new int[256];
     private readonly object sync = new();
     private double centerFrequency = 7_100_000;
-    private const double MaximumFrequency = 30_000_000;
+    private double MaximumFrequency = 30_000_000;
+    private double zoomFrequencyRange = 30_000_000;
     private int zoomLevel = 11;
-    private double span = MaximumFrequency / (1 << 11);
+    private double span = 30_000_000d / (1 << 11);
     private Point dragStart;
     private double dragFrequency;
     private bool moved;
@@ -83,11 +84,19 @@ public sealed class WaterfallControl : Control
     }
     public void SetPassbandWidth(int bandwidth) { passbandWidth = Math.Clamp(bandwidth, 50, 12_000); Invalidate(); }
     internal void SetBookmarks(IReadOnlyList<FrequencyBookmark> items) { bookmarks = items.ToArray(); Invalidate(); }
+    public void ClearHistory()
+    {
+        lock(sync){Array.Fill(pixels,Color.Black.ToArgb());using var g=Graphics.FromImage(bitmap);g.Clear(Color.Black);latestSpectrum=Array.Empty<byte>();receivedLines=0;}
+        Invalidate();
+    }
+    public void SetFrequencyLimit(double maximum, double? zoomRange = null) { MaximumFrequency = Math.Max(30_000_000,maximum); zoomFrequencyRange = zoomRange ?? MaximumFrequency; }
+    public double VisibleSpan => span;
+    public double CenterFrequency => centerFrequency;
     public void SetRadioState(double center, double span, double tuned, double passband)
     {
         centerFrequency = center;
-        zoomLevel = Math.Clamp((int)Math.Round(Math.Log(MaximumFrequency / span, 2)), 0, 14);
-        this.span = MaximumFrequency / (1 << zoomLevel);
+        zoomLevel = Math.Clamp((int)Math.Round(Math.Log(zoomFrequencyRange / span, 2)), 0, 14);
+        this.span = zoomFrequencyRange / (1 << zoomLevel);
         tunedFrequency = tuned;
         passbandWidth = Math.Clamp(passband, 50, this.span * 0.9);
         Invalidate();
@@ -325,7 +334,7 @@ public sealed class WaterfallControl : Control
         var previousCenter = centerFrequency;
         var previousSpan = span;
         zoomLevel = nextZoom;
-        span = MaximumFrequency / (1 << zoomLevel);
+        span = zoomFrequencyRange / (1 << zoomLevel);
         centerFrequency = Math.Clamp(tunedFrequency, span / 2, MaximumFrequency - span / 2);
         ReprojectWaterfallHistory(previousCenter, previousSpan, centerFrequency, span);
         RaiseViewChanged();

@@ -4,8 +4,10 @@ function nominalfreq(){return freq}
 function setfreqif(v){freq=parseFloat(v)}
 function set_mode(v){mode=v.toUpperCase()}
 function updbw(){}
+function waterfallheight(h){document.getElementById("test-waterfall").height=h;}
+function stretch_waterfalls(){}
 function set_volume(v){window.volume=v}
 function setmute(v){window.muted=v}
 var soundapplet={audioresume(){window.resumed=true}};
 </script>
-<body><header id="duplicate">Receiver header</header><div id="wfccontainer"><div id="waterfalls"><canvas id="test-waterfall"></canvas></div></div><div id="native-duplicate">Frequency, mode and volume</div><div class="tabs"><div class="tab"><div class="ctl"><input id="wf-brightness" type="range" oninput="window.adjusted=true"></div></div><div id="web-chat">Web chat</div></div></body>
+<body><header id="duplicate">Receiver header</header><div id="wfccontainer"><div id="waterfalls"><canvas id="test-waterfall" class="html5waterfall"></canvas></div></div><div id="native-duplicate">Frequency, mode and volume</div><div class="tabs"><div class="tab"><div class="ctl"><input type="checkbox" id="wfwidecheckbox" onclick="window.fullWidthApplied=this.checked"><input type="checkbox" id="wfstickycheckbox" onclick="window.stickyApplied=this.checked"><input id="wf-brightness" type="range" oninput="window.adjusted=true"></div></div><div id="web-chat">Web chat</div></div></body>

@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 namespace KiwiDX;
 public partial class Form1
 {
@@ -10,7 +10,7 @@ public partial class Form1
             await receiver.ReadStateAsync();
             return receiver == webReceiver && receiver.Ready ? new(currentServerUrl, receiver.FrequencyHz, receiver.Mode, receiver.Protocol) : null;
         }
-        return client.IsConnected ? new(currentServerUrl, waterfall.TunedFrequency, modeBox.Text, "KiwiSDR") : null;
+        return client.IsConnected ? new(currentServerUrl, waterfall.TunedFrequency, modeBox.Text, client.IsSpyServer ? "SpyServer" : client.IsOpenWebRx ? "OpenWebRX" : "KiwiSDR") : null;
     }
     private async Task TuneChatReceiverAsync(ReceiverShare share)
     {

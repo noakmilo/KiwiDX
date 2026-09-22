@@ -36,11 +36,11 @@ public partial class Form1
         foreach(Control c in new Control[]{connectButton,map,favoriteButton,chatToggle}) c.Anchor=AnchorStyles.None;
         chatToggle.Click += async (_, _) => { if(chatWindow is { Visible:true }) {chatWindow.Activate();return;} ShowSidebar(sidebar=="chat"?"":"chat"); if(sidebar=="chat") await communityChat.ActivateAsync(); };
         var tuning = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 9, RowCount = 1, BackColor = WorkspaceTheme.Surface, Padding = new Padding(6,6,6,6), Margin = Padding.Empty };
-        foreach(var width in new[]{48,140,84,270,52,85,74,90,0}) tuning.ColumnStyles.Add(width==0?new ColumnStyle(SizeType.Percent,100):new ColumnStyle(SizeType.Absolute,width));
+        foreach(var width in new[]{48,170,84,270,52,85,74,90,0}) tuning.ColumnStyles.Add(width==0?new ColumnStyle(SizeType.Percent,100):new ColumnStyle(SizeType.Absolute,width));
         tuning.RowStyles.Add(new RowStyle(SizeType.Percent,100));
-        tuning.SizeChanged += (_,_)=> tuning.ColumnStyles[3].Width = Math.Clamp(tuning.Width-600,170,280);
+        tuning.SizeChanged += (_,_)=> tuning.ColumnStyles[3].Width = Math.Clamp(tuning.Width-630,170,280);
         bandBox.FormattingEnabled = true;
-        bandBox.Format += (_, e) => { if (e.ListItem is BandPreset band) e.Value = band.Name.Split(' ')[0].Replace("m", " m"); };
+        bandBox.Format += (_, e) => { if (e.ListItem is BandPreset band) e.Value = band.Name.Replace("m (Amateur)", " m ham radio").Replace("m (Broadcast)", " m broadcast"); };
         bandBox.Font = new Font(Font.FontFamily,10);bandBox.Dock=DockStyle.Fill;
         frequencyBox.Font = new Font(Font.FontFamily,18,FontStyle.Bold); frequencyBox.TextAlign=HorizontalAlignment.Center; frequencyBox.BorderStyle=BorderStyle.None; frequencyBox.Dock=DockStyle.Fill;
         var frequencyPanel = new TableLayoutPanel { Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,BackColor=WorkspaceTheme.Input,Padding=new Padding(4),Margin=new Padding(4,0,8,0) };

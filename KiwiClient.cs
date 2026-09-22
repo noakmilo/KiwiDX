@@ -8,6 +8,51 @@ namespace KiwiDX;
 
 public sealed class KiwiClient : IAsyncDisposable
 {
+    private OpenWebRxClient? openWebRx;
+    private SpyServerClient? spyServer;
+    public bool IsSpyServer => spyServer is not null;
+    public bool HasNativeSpectrum => IsOpenWebRx || IsSpyServer;
+    public double ReceiverMaximumFrequency => spyServer?.MaximumFrequency ?? 30_000_000;
+    public string? OpenWebRxProfileId => openWebRx?.ProfileId;
+    public bool IsOpenWebRx => openWebRx is not null;
+    public event EventHandler<(double Center,double Span,double Frequency)>? SpectrumConfiguration;
+    public event EventHandler<(string Id,string Name)[]>? ReceiverProfiles;
+    public void SelectProfile(string id) => openWebRx?.SelectProfile(id);
+    public void SetSpectrumView(double center,double span) { openWebRx?.SetView(center,span); spyServer?.SetView(center,span); }
+    public async Task ConnectOpenWebRxAsync(string url,double frequency,string mode,int bandwidth)
+    {
+        var backend=new OpenWebRxClient();openWebRx=backend;
+        audioBuffer=new BufferedWaveProvider(new WaveFormat(12000,16,1)){DiscardOnBufferOverflow=true};
+        audioOutput=new WaveOutEvent();audioOutput.Init(audioBuffer);
+        backend.Audio+=pcm=>{if(openWebRx!=backend)return;audioBuffer?.AddSamples(pcm,0,pcm.Length);CaptureRecordingAudio(pcm);};
+        backend.Spectrum+=line=>{if(openWebRx==backend)WaterfallLine?.Invoke(this,line);};
+        backend.Status+=message=>{if(openWebRx==backend)StatusChanged?.Invoke(this,message);};
+        backend.Configuration+=(c,r,f)=>{if(openWebRx==backend)SpectrumConfiguration?.Invoke(this,(c,r,f));};
+        backend.Profiles+=profiles=>{if(openWebRx==backend)ReceiverProfiles?.Invoke(this,profiles);};
+        backend.Details+=(title,details)=>{if(openWebRx==backend)ServerInfoChanged?.Invoke(this,$"URL: {url}\nStation / operator message: {title}\n{details}");};
+        StatusChanged?.Invoke(this,"Connecting to OpenWebRX...");
+        await backend.ConnectAsync(url,frequency,mode,bandwidth);
+        StatusChanged?.Invoke(this,"Connected to OpenWebRX (native)");
+    }
+    public async Task ConnectSpyServerAsync(string url, double frequency, string mode, int bandwidth)
+    {
+        var backend = new SpyServerClient(); spyServer = backend;
+        backend.Log += message => Log?.Invoke(this, message);
+        audioBuffer = new BufferedWaveProvider(new WaveFormat(12000,16,1)) { BufferDuration = TimeSpan.FromSeconds(1), DiscardOnBufferOverflow = true };
+        audioOutput = new WaveOutEvent(); audioOutput.Init(audioBuffer);
+        backend.Audio += pcm => {
+            if (spyServer != backend) return;
+            var buffer = audioBuffer;
+            if (buffer is not null) { if (buffer.BufferedDuration.TotalMilliseconds > 500) buffer.ClearBuffer(); buffer.AddSamples(pcm,0,pcm.Length); }
+            CaptureRecordingAudio(pcm);
+        };
+        backend.Spectrum += line => { if (spyServer == backend) WaterfallLine?.Invoke(this,line); };
+        backend.Status += message => { if (spyServer == backend) StatusChanged?.Invoke(this,message); };
+        backend.Error += message => { if (spyServer == backend) { audioBuffer?.ClearBuffer(); CancelRecording(); audioOutput?.Stop(); Error?.Invoke(this,message); } };
+        backend.Configuration += (c,s,f) => { if (spyServer == backend) SpectrumConfiguration?.Invoke(this,(c,s,f)); };
+        backend.Details += (title,details) => { if (spyServer == backend) ServerInfoChanged?.Invoke(this,$"URL: {url}\nStation / operator message: {title}\n{details}"); };
+        await backend.ConnectAsync(url,frequency,mode,bandwidth);
+    }
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(10) };
     private volatile int receiverChannel = -1;
     private ClientWebSocket? audioSocket;
@@ -44,7 +89,7 @@ public sealed class KiwiClient : IAsyncDisposable
     private int audioAdpcmValue;
     private static readonly int[] AdpcmIndexAdjust = { -1, -1, -1, -1, 2, 4, 6, 8, -1, -1, -1, -1, 2, 4, 6, 8 };
     private static readonly int[] AdpcmSteps = { 7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 19, 21, 23, 25, 28, 31, 34, 37, 41, 45, 50, 55, 60, 66, 73, 80, 88, 97, 107, 118, 130, 143, 157, 173, 190, 209, 230, 253, 279, 307, 337, 371, 408, 449, 494, 544, 598, 658, 724, 796, 876, 963, 1060, 1166, 1282, 1411, 1552, 1707, 1878, 2066, 2272, 2499, 2749, 3024, 3327, 3660, 4026, 4428, 4871, 5358, 5894, 6484, 7132, 7845, 8630, 9493, 10442, 11487, 12635, 13899, 15289, 16818, 18500, 20350, 22385, 24623, 27086, 29794, 32767 };
-    public bool IsConnected => audioSocket?.State == WebSocketState.Open;
+    public bool IsConnected => spyServer?.IsConnected ?? openWebRx?.IsConnected ?? (audioSocket?.State == WebSocketState.Open);
     public bool IsRecording { get { lock (recordingSync) return recordingWriter is not null; } }
     public event EventHandler<(int Percent, string Stage)>? ConnectionProgress;
     public event EventHandler<byte[]>? WaterfallLine;
@@ -138,11 +183,12 @@ public sealed class KiwiClient : IAsyncDisposable
         Log?.Invoke(this, "WebSockets open: audio and waterfall");
     }
 
-    public void SetFrequency(double frequency) { frequencyHz = Math.Clamp(frequency, 10_000, 30_000_000); SendTuning(); }
-    public void SetMode(string mode) { currentMode = NormalizeMode(mode); (lowCut, highCut) = GetPassband(currentMode, currentBandwidth); SendTuning(); }
-    public void SetBandwidth(int bandwidth) { currentBandwidth = bandwidth; (lowCut, highCut) = GetPassband(currentMode, currentBandwidth); SendTuning(); }
+    public void SetFrequency(double frequency) { if(spyServer is not null){spyServer.Tune(hz:frequency);return;} if(openWebRx is not null){openWebRx.Tune(hz:frequency);return;} frequencyHz = Math.Clamp(frequency, 10_000, 30_000_000); SendTuning(); }
+    public void SetMode(string mode) { if(spyServer is not null){spyServer.Tune(modulation:mode);return;} if(openWebRx is not null){openWebRx.Tune(modulation:mode.ToLowerInvariant());return;} currentMode = NormalizeMode(mode); (lowCut, highCut) = GetPassband(currentMode, currentBandwidth); SendTuning(); }
+    public void SetBandwidth(int bandwidth) { if(spyServer is not null){spyServer.Tune(filter:bandwidth);return;} if(openWebRx is not null){openWebRx.Tune(bandwidth:bandwidth);return;} currentBandwidth = bandwidth; (lowCut, highCut) = GetPassband(currentMode, currentBandwidth); SendTuning(); }
     public void SetWaterfallView(int zoom, double centerFrequency)
     {
+        if(openWebRx is not null){openWebRx.SetView(centerFrequency,30_000_000d/(1<<zoom));return;}
         waterfallZoom = Math.Clamp(zoom, 0, 14);
         waterfallCenterHz = Math.Clamp(centerFrequency, 0, 30_000_000);
         SendText(waterfallSocket, waterfallSendLock, $"SET zoom={waterfallZoom} cf={waterfallCenterHz / 1_000:0.000}");
@@ -159,6 +205,7 @@ public sealed class KiwiClient : IAsyncDisposable
         Interlocked.Exchange(ref lastAudioDataTicks, DateTime.UtcNow.Ticks);
         Interlocked.Exchange(ref audioPlaybackRequested, 1);
         audioOutput.Play();
+        if(HasNativeSpectrum){StatusChanged?.Invoke(this,"Audio playing");return;}
         SendText(audioSocket, audioSendLock, "SET reinit");
         SendText(audioSocket, audioSendLock, "SET agc=1 hang=0 thresh=-100 slope=6 decay=1000 manGain=50");
         SendText(audioSocket, audioSendLock, "SET squelch=0 max=0");
@@ -484,7 +531,7 @@ public sealed class KiwiClient : IAsyncDisposable
         catch (Exception ex) { ServerInfoChanged?.Invoke(this, $"Server: {baseUri}{Environment.NewLine}Public server details unavailable: {ex.Message}"); }
     }
 
-    public async Task DisconnectAsync() { connectionEstablished = false; Interlocked.Exchange(ref audioPlaybackRequested, 0); CancelRecording(); cancellation?.Cancel(); statsTimer?.Dispose(); statsTimer = null; keepAliveTimer?.Dispose(); keepAliveTimer = null; watchdogTimer?.Dispose(); watchdogTimer = null; audioOutput?.Stop(); audioOutput?.Dispose(); audioOutput = null; audioBuffer = null; if (audioSocket is not null) await Close(audioSocket); if (waterfallSocket is not null) await Close(waterfallSocket); audioSocket = null; waterfallSocket = null; StatusChanged?.Invoke(this, "Disconnected"); }
+    public async Task DisconnectAsync() { var spy=spyServer;spyServer=null;if(spy is not null)await spy.DisposeAsync(); var backend=openWebRx;openWebRx=null;if(backend is not null)await backend.DisposeAsync(); connectionEstablished = false; Interlocked.Exchange(ref audioPlaybackRequested, 0); CancelRecording(); cancellation?.Cancel(); statsTimer?.Dispose(); statsTimer = null; keepAliveTimer?.Dispose(); keepAliveTimer = null; watchdogTimer?.Dispose(); watchdogTimer = null; audioOutput?.Stop(); audioOutput?.Dispose(); audioOutput = null; audioBuffer = null; if (audioSocket is not null) await Close(audioSocket); if (waterfallSocket is not null) await Close(waterfallSocket); audioSocket = null; waterfallSocket = null; StatusChanged?.Invoke(this, "Disconnected"); }
     private static async Task Close(ClientWebSocket socket)
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));

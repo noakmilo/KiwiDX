@@ -2,6 +2,10 @@ namespace KiwiDX;
 
 internal sealed record FavoriteServer(string Title, string Location, string Url)
 {
+    public bool HasCustomDescription { get; init; }
+    public string Antenna { get; init; } = "Antenna not reported";
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string DisplayText => $"{Url} | {Location}, {Antenna}";
     public string Protocol { get; init; } = "Auto";
 }
 

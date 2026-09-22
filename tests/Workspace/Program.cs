@@ -61,6 +61,49 @@ class Program {
  }
  using var bitmap=new Bitmap(f.Width,f.Height);f.DrawToBitmap(bitmap,new Rectangle(0,0,f.Width,f.Height));Directory.CreateDirectory("dist");bitmap.Save("dist/workspace-v0.2.0.png");
  foreach(var width in new[]{1100,1280,1586}){f.Size=new Size(width,850);Application.DoEvents();if(wf.Width<650||wf.Height<250)throw new Exception("Receiver area collapsed");}
- Console.WriteLine("PASS: chat/details toggles and console window preserve receiver height.");Console.WriteLine("PASS: workspace remains usable at 1100, 1280 and 1586 pixels.");Console.WriteLine("Preview: dist/workspace-v0.2.0.png");f.Close();
+ Console.WriteLine("PASS: chat/details toggles and console window preserve receiver height.");Console.WriteLine("PASS: workspace remains usable at 1100, 1280 and 1586 pixels.");Console.WriteLine("Preview: dist/workspace-v0.2.0.png");if(Environment.GetEnvironmentVariable("KIWIDX_TEST_OWRX") is string address && address.Length>0){
+ var task=(Task)typeof(Form1).GetMethod("SwitchReceiverAsync",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(f,new object?[]{address,"OpenWebRX",7100000d,"USB"})!;
+ var deadline=Environment.TickCount64+30000;
+ while(!task.IsCompleted && Environment.TickCount64<deadline){Application.DoEvents();Thread.Sleep(10);}
+ if(!task.IsCompleted)throw new Exception("Native connection UI timeout");task.GetAwaiter().GetResult();
+ var native=(KiwiClient)Field("client");
+ if(!native.IsConnected||!native.IsOpenWebRx||typeof(Form1).GetField("webReceiver",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(f) is not null)throw new Exception("OpenWebRX did not use native receiver");
+ var selector=(ComboBox)Field("bandBox");
+ if(selector.Items.Count==0 || selector.Items[0]!.GetType().Name!="OpenWebRxProfile")throw new Exception("Band selector is not populated with receiver profiles");
+ var before=wf.TunedFrequency;
+ var candidate=selector.Items.Cast<object>().FirstOrDefault(p=>p.ToString()!.Contains(before>20000000?"40m":"10m",StringComparison.OrdinalIgnoreCase));
+ if(candidate is null)throw new Exception("Test profile unavailable");
+ selector.SelectedItem=candidate;
+ var profileDeadline=Environment.TickCount64+15000;
+ while(wf.TunedFrequency==before && Environment.TickCount64<profileDeadline){Application.DoEvents();Thread.Sleep(10);}
+ if(wf.TunedFrequency==before)throw new Exception("Selecting a band did not change receiver profile");
+ Console.WriteLine("PASS: native Band selector changes the live OpenWebRX profile and tuning.");
+ native.StartRecording();var until=Environment.TickCount64+1500;while(Environment.TickCount64<until){Application.DoEvents();Thread.Sleep(10);}
+ var recording=native.StopRecording();if(new FileInfo(recording).Length<1000)throw new Exception("No audio recorded");File.Delete(recording);
+ using(var preview=new Bitmap(f.Width,f.Height)){f.DrawToBitmap(preview,new Rectangle(Point.Empty,f.Size));preview.Save("dist/openwebrx-native.png");}
+ Console.WriteLine("PASS: native OpenWebRX connects without WebView and records received PCM audio.");
+}
+if(Environment.GetEnvironmentVariable("KIWIDX_TEST_SPY") is string spyAddress && spyAddress.Length>0){
+ var task=(Task)typeof(Form1).GetMethod("SwitchReceiverAsync",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(f,new object?[]{spyAddress,"Auto",7100000d,"AM"})!;
+ var deadline=Environment.TickCount64+30000;
+ while(!task.IsCompleted && Environment.TickCount64<deadline){Application.DoEvents();Thread.Sleep(10);}
+ if(!task.IsCompleted)throw new Exception("SpyServer UI connection timeout"); task.GetAwaiter().GetResult();
+ var native=(KiwiClient)Field("client");if(!native.IsSpyServer||!native.IsConnected||Field("webReceiver") is not null)throw new Exception("SpyServer did not connect natively");
+ native.StartRecording();var until=Environment.TickCount64+5000;while(Environment.TickCount64<until){Application.DoEvents();Thread.Sleep(10);}
+ var recording=native.StopRecording();if(new FileInfo(recording).Length<24000)throw new Exception("SpyServer audio recording is empty");File.Delete(recording);
+ foreach(var m in new[]{"USB","LSB","CW","NFM","AM"}){((ComboBox)Field("modeBox")).SelectedItem=m;Application.DoEvents();}
+ ((TextBox)Field("frequencyBox")).Text="7.200000";Call("SendFrequency");
+ until=Environment.TickCount64+1000;while(Environment.TickCount64<until){Application.DoEvents();Thread.Sleep(10);}
+ if(Math.Abs(wf.TunedFrequency-7200000)>1)throw new Exception("Native SpyServer tuning failed");
+ using(var preview=new Bitmap(f.Width,f.Height)){f.DrawToBitmap(preview,new Rectangle(Point.Empty,f.Size));preview.Save("dist/spyserver-native.png");}
+ var disconnect=native.DisconnectAsync();while(!disconnect.IsCompleted){Application.DoEvents();Thread.Sleep(10);}disconnect.GetAwaiter().GetResult();
+ Call("OpenConsoleWindow");Application.DoEvents();Call("RefreshConsole");
+ var visibleLog=((TextBox)Field("consoleBox")).Text;
+ if(!visibleLog.Contains("TCP connected") || !visibleLog.Contains("First FFT") || !visibleLog.Contains("Disconnected; receiver workers stopped"))throw new Exception("SpyServer diagnostics did not reach Console Log");
+ ((Form)Field("consoleWindow")).Close();
+ Console.WriteLine("PASS: SpyServer diagnostics are visible in Console Log, including disconnect.");
+ Console.WriteLine("PASS: SpyServer Auto routing, native waterfall, tuning, mode controls, audio recording and disconnect.");
+}
+f.Close();
  }
 }

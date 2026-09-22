@@ -80,7 +80,8 @@ internal sealed class WebReceiverControl : UserControl
         var generation = navigation;
         try
         {
-            await Script(WaterfallLayoutScript(protocol));
+            if (protocol == "OpenWebRX") await Script(WaterfallLayoutScript(protocol));
+            if (new Uri(url).Host.Equals("websdr.ewi.utwente.nl", StringComparison.OrdinalIgnoreCase)) await Script(TwenteScrollScript);
             var json = await Script(protocol == "OpenWebRX" ? """
                 if(typeof getDemodulators!=='function')return null;
                 const d=getDemodulators()[0]; if(!d)return null;
@@ -100,6 +101,14 @@ internal sealed class WebReceiverControl : UserControl
             Ready = Mode.Length > 0;
             if (!initialized)
             {
+                if (protocol == "WebSDR") await Script("""
+                    for (const id of ['wfwidecheckbox', 'wfstickycheckbox']) {
+                        const checkbox = document.getElementById(id);
+                        if (checkbox && !checkbox.checked) checkbox.click();
+                    }
+                    window.dispatchEvent(new Event('resize'));
+                    """);
+                if (disposed || generation != navigation) return;
                 initialized = true;
                 SetFrequency(initialFrequency); SetMode(initialMode); Play();
                 StatusChanged?.Invoke(this, "Connected to " + protocol + ". Tune using KiwiDX; waterfall controls remain in the receiver panel.");
@@ -109,13 +118,40 @@ internal sealed class WebReceiverControl : UserControl
         }
         catch (JsonException) { Ready = false; }
     }
+    internal const string TwenteScrollScript = """
+        const waterfall=document.querySelector('#wfcontainer') || document.querySelector('.html5waterfall');
+        if(!waterfall || waterfall.getBoundingClientRect().height<=0)return false;
+        if(!window.__kiwidxTwenteScroll){
+            const lock={target:0,size:''};window.__kiwidxTwenteScroll=lock;
+            document.documentElement.style.setProperty('overflow-y','hidden','important');
+            document.body.style.setProperty('overflow-y','hidden','important');
+            lock.apply=()=>{if(Math.abs(window.scrollY-lock.target)>1)window.scrollTo(window.scrollX,lock.target);};
+            window.addEventListener('scroll',lock.apply);
+            window.addEventListener('wheel',e=>{if(e.cancelable)e.preventDefault();},{passive:false});
+            window.addEventListener('resize',()=>{lock.size='';});
+        }
+        const lock=window.__kiwidxTwenteScroll;
+        const page=document.scrollingElement || document.documentElement;
+        const size=waterfall.getBoundingClientRect().height+':'+innerHeight+':'+innerWidth+':'+page.scrollHeight;
+        if(lock.size!==size){
+            // Measure before sticky positioning shifts the receiver block.
+            window.scrollTo(window.scrollX,0);
+            lock.target=Math.max(0,Math.min(page.scrollHeight-innerHeight,waterfall.getBoundingClientRect().bottom-innerHeight));
+            lock.size=size;
+        }
+        lock.apply();
+        return true;
+        """;
+
     // Keep the original DOM and event handlers: the native controls still call the receiver APIs.
     internal static string WaterfallLayoutScript(string protocol) => "const openRx=" + (protocol == "OpenWebRX" ? "true;" : "false;") + """
-        const surface=document.querySelector(openRx?'.openwebrx-waterfall-container':'#wfccontainer');
+        const canvas=document.querySelector('.html5waterfall');
+        const surface=openRx?document.querySelector('.openwebrx-waterfall-container'):(document.querySelector('#wfccontainer') || canvas?.closest('#wfcontainer') || canvas?.parentElement);
         if(!surface)return false;
+        if(!openRx && !canvas)return false;
         const roots=openRx
           ? [...document.querySelectorAll('#openwebrx-frequency-container,#webrx-canvas-background,#openwebrx-error-overlay,#openwebrx-autoplay-overlay,#openwebrx-sdr-profiles-listbox,[id^="openwebrx-waterfall-color"],.openwebrx-zoom-button')]
-          : [surface,...document.querySelectorAll('#audiostartbutton,.warning'),
+          : [surface,...document.querySelectorAll('.html5waterfall,#audiostartbutton,.warning'),
              ...[...document.querySelectorAll('[onchange*="waterfall"],[onclick*="wfset"],#wfwidecheckbox,#wf-brightness')].map(e=>e.closest('.ctl')).filter(Boolean)];
         if(openRx && !document.querySelector('#webrx-canvas-background'))return false;
         const paths=new Set();

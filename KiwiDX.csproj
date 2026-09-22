@@ -7,9 +7,10 @@
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
     <DefaultItemExcludes>$(DefaultItemExcludes);dist/**;tests/**</DefaultItemExcludes>
-    <AssemblyName>KiwiDX_v0.2.0</AssemblyName>
-    <Version>0.2.0</Version>
-    <FileVersion>0.2.0.0</FileVersion>
+    <AssemblyName>KiwiDX_v0.2.1</AssemblyName>
+    <Version>0.2.1</Version>
+    <ReleaseVersion>0.2.1</ReleaseVersion>
+    <FileVersion>0.2.1.0</FileVersion>
     <RootNamespace>KiwiDX</RootNamespace>
     <ApplicationIcon>icon.ico</ApplicationIcon>
   </PropertyGroup>
@@ -24,6 +25,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="design/maps/leaflet.js;design/maps/leaflet.css;design/maps/world.geojson" />
+    <None Update="design/maps/Leaflet-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="design/maps/README.md" CopyToOutputDirectory="PreserveNewest" />
     <None Update="ffmpeg.exe" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Text.RegularExpressions;
 namespace KiwiDX;
 
@@ -13,11 +13,11 @@ internal sealed record ReceiverShare(string Url, double FrequencyHz, string Mode
         {
             var values = uri.Query.TrimStart('?').Split('&').Select(p => p.Split('=', 2)).Where(p => p.Length == 2)
                 .ToDictionary(p => Uri.UnescapeDataString(p[0]), p => Uri.UnescapeDataString(p[1]));
-            if (!values.TryGetValue("rx", out var rx) || !Uri.TryCreate(rx, UriKind.Absolute, out var target) || target.Scheme is not ("http" or "https") || target.UserInfo.Length > 0) return null;
+            if (!values.TryGetValue("rx", out var rx) || !Uri.TryCreate(rx, UriKind.Absolute, out var target) || (target.Scheme is not ("http" or "https") && !SpyServerAddress.TryParse(rx, out _)) || target.UserInfo.Length > 0) return null;
             if (!values.TryGetValue("hz", out var hz) || !double.TryParse(hz, NumberStyles.Float, CultureInfo.InvariantCulture, out var frequency) || !double.IsFinite(frequency) || frequency <= 0 || frequency > 1e12) return null;
             if (!values.TryGetValue("mode", out var mode) || !Regex.IsMatch(mode, "^[A-Za-z0-9+_-]{1,20}$")) return null;
             var protocol = ReceiverProtocols.Normalize(values.GetValueOrDefault("protocol"));
-            return new(rx, frequency, mode.ToUpperInvariant(), protocol);
+            return new(rx, frequency, mode.ToUpperInvariant(), target.Scheme == "sdr" ? "SpyServer" : protocol);
         }
         catch (ArgumentException) { return null; }
     }

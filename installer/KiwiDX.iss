@@ -29,7 +29,7 @@ SolidCompression=yes
 WizardStyle=modern
 CloseApplications=yes
 RestartApplications=no
-VersionInfoVersion={#AppVersion}.0
+VersionInfoVersion={#FileVersion}
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"

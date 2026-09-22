@@ -100,7 +100,7 @@ public partial class Form1 : Form
 
     public Form1()
     {
-        Text = "KiwiDX v0.2.0 - Community Driven SDR Listener";
+        Text = "KiwiDX v0.2.1 - Community Driven SDR Listener";
         Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
         Width = 1440;
         Height = 900;
@@ -121,9 +121,9 @@ public partial class Form1 : Form
         urlBox.Enter += (_, _) => { if (urlBox.Items.Count > 0) urlBox.DroppedDown = true; };
         urlBox.SelectionChangeCommitted += (_, _) =>
         {
-            if (urlBox.SelectedItem is FavoriteServer selected) { urlBox.Text = selected.Url; protocolBox.SelectedItem = ReceiverProtocols.Normalize(selected.Protocol); }
+            if (urlBox.SelectedItem is FavoriteServer selected) { urlBox.Text = selected.DisplayText; protocolBox.SelectedItem = ReceiverProtocols.Normalize(selected.Protocol); }
         };
-        urlBox.DisplayMember = nameof(FavoriteServer.Url);
+        urlBox.DisplayMember = nameof(FavoriteServer.DisplayText);
         urlBox.KeyDown += async (_, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; urlBox.DroppedDown = false; await ToggleConnection(); } };
         urlBox.TextChanged += (_, _) =>
         {
@@ -133,6 +133,7 @@ public partial class Form1 : Form
         };
         connectButton.Text = "Connect";
         connectButton.AutoSize = true;
+        connectButton.EnabledChanged += (_, _) => { urlBox.Enabled = connectButton.Enabled; if (!connectButton.Enabled) urlBox.DroppedDown = false; };
         connectButton.Click += async (_, _) => await ToggleConnection();
         var mapButton = new RadioButton { Text = "Map", Glyph = RadioGlyph.Globe };
         mapButton.Click += (_, _) => OpenReceiverMap();
@@ -197,7 +198,7 @@ public partial class Form1 : Form
         waterfall.ViewChanged += (_, view) =>
         {
             SyncNavigation(view.center, view.span);
-            client.SetWaterfallView(SpanToZoom(view.span), view.center);
+            if(client.HasNativeSpectrum)client.SetSpectrumView(view.center,view.span);else client.SetWaterfallView(SpanToZoom(view.span), view.center);
         };
         waterfall.AddHamLogRequested += (_, frequency) => AddListeningLog(true, frequency);
         waterfall.AddShortwaveLogRequested += (_, frequency) => AddListeningLog(false, frequency);
@@ -226,6 +227,27 @@ public partial class Form1 : Form
         communityChat.TuneReceiver = TuneChatReceiverAsync;
         BuildWorkspace(menuStrip, mapButton);
 
+        client.SpectrumConfiguration += (_,cfg) => { if(!IsDisposed)BeginInvoke(()=>{
+            if(!client.HasNativeSpectrum)return;
+            selectingDetectedBand=true;
+            try { if(client.IsOpenWebRx) bandBox.SelectedItem=bandBox.Items.OfType<OpenWebRxProfile>().FirstOrDefault(p=>p.Id==client.OpenWebRxProfileId); }
+            finally { selectingDetectedBand=false; }
+            waterfall.SetFrequencyLimit(Math.Max(client.ReceiverMaximumFrequency,cfg.Center+cfg.Span), client.IsSpyServer ? 30_000_000 : null);
+            frequencyBox.Text=(cfg.Frequency/1_000_000).ToString("0.000000",CultureInfo.InvariantCulture);
+            waterfall.SetRadioState(cfg.Center,cfg.Span,cfg.Frequency,(int)bandwidthBox.Value);
+            client.SetSpectrumView(waterfall.CenterFrequency,waterfall.VisibleSpan);
+        });};
+        client.ReceiverProfiles += (_,profiles)=>{if(!IsDisposed)BeginInvoke(()=>{
+            openWebRxProfiles.DropDownItems.Clear();
+            var selectedProfile = client.OpenWebRxProfileId;
+            selectingDetectedBand=true;
+            try {
+                bandBox.Items.Clear();
+                bandBox.Items.AddRange(profiles.Select(p=>(object)new OpenWebRxProfile(p.Id,p.Name)).ToArray());
+                bandBox.SelectedItem=bandBox.Items.Cast<OpenWebRxProfile>().FirstOrDefault(p=>p.Id==selectedProfile);
+            } finally { selectingDetectedBand=false; }
+            foreach(var profile in profiles){var item=new ToolStripMenuItem(profile.Name);item.Click+=(_,_)=>bandBox.SelectedItem=bandBox.Items.Cast<OpenWebRxProfile>().FirstOrDefault(p=>p.Id==profile.Id);openWebRxProfiles.DropDownItems.Add(item);}
+        });};
         client.WaterfallLine += (_, line) => Interlocked.Exchange(ref pendingWaterfallLine, line);
         receiverUiTimer.Tick += (_, _) =>
         {
@@ -251,7 +273,7 @@ public partial class Form1 : Form
                 }
             });
         };
-        client.Error += (_, error) => { if (!IsDisposed) BeginInvoke(() => MessageBox.Show(this, error, "KiwiSDR", MessageBoxButtons.OK, MessageBoxIcon.Warning)); };
+        client.Error += (_, error) => { if (!IsDisposed) BeginInvoke(() => MessageBox.Show(this, error, "KiwiDX receiver", MessageBoxButtons.OK, MessageBoxIcon.Warning)); };
         client.Log += (_, message) => AddLog(message);
         client.ConnectionProgress += (_, progress) => { if (!IsDisposed && IsHandleCreated) BeginInvoke(() => { if (!connectButton.Enabled) ShowConnectionProgress(progress.Percent, progress.Stage); }); };
         client.ServerInfoChanged += (_, info) => { if (!IsDisposed) BeginInvoke(() => SetServerInfo(info)); };
@@ -270,10 +292,19 @@ public partial class Form1 : Form
     {
         var infoUrl = ReadServerInfoField(info, "URL");
         if (webReceiver is not null || (infoUrl is not null && !NormalizeServerUrl(infoUrl).Equals(NormalizeServerUrl(currentServerUrl), StringComparison.OrdinalIgnoreCase))) return;
-        currentServerAntenna = ReadServerInfoField(info, "Antenna") ?? "Not reported";
+        var savedSpy = client.IsSpyServer ? LoadFavorites().FirstOrDefault(f => NormalizeServerUrl(f.Url) == NormalizeServerUrl(currentServerUrl)) : null;
+        currentServerAntenna = ReadServerInfoField(info, "Antenna") ?? savedSpy?.Antenna ?? "Not reported";
         currentServerTitle = ReadServerInfoField(info, "Station / operator message") ?? "KiwiSDR";
-        currentServerLocation = ReadServerInfoField(info, "Location") ?? "Location not reported";
+        currentServerLocation = ReadServerInfoField(info, "Location") ?? savedSpy?.Location ?? "Location not reported";
         currentServerUrl = (ReadServerInfoField(info, "URL") ?? currentServerUrl).TrimEnd('/');
+        var savedFavorites = LoadFavorites();
+        var savedIndex = savedFavorites.FindIndex(f => NormalizeServerUrl(f.Url) == NormalizeServerUrl(currentServerUrl));
+        if (savedIndex >= 0)
+        {
+            var saved = savedFavorites[savedIndex];
+            var updated = saved with { Location = saved.HasCustomDescription ? saved.Location : currentServerLocation, Antenna = currentServerAntenna };
+            if (updated != saved) { savedFavorites[savedIndex] = updated; if (SaveFavorites(savedFavorites)) RefreshFavoritesMenu(); }
+        }
         UpdateFavoriteButton();
         serverInfoBox.Clear();
         foreach (var line in info.Replace("\r", "").Split('\n'))
@@ -355,7 +386,7 @@ public partial class Form1 : Form
     private void MoveDial(double deltaHz)
     {
         if (!double.TryParse(frequencyBox.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out var mhz)) return;
-        var frequency = webReceiver is null ? Math.Clamp(mhz * 1_000_000 + deltaHz, 10_000, 30_000_000) : Math.Max(1, mhz * 1_000_000 + deltaHz);
+        var frequency = webReceiver is null && !client.HasNativeSpectrum ? Math.Clamp(mhz * 1_000_000 + deltaHz, 10_000, 30_000_000) : Math.Max(1, mhz * 1_000_000 + deltaHz);
         frequencyBox.Text = (frequency / 1_000_000).ToString("0.000000", CultureInfo.InvariantCulture);
         waterfall.SetTunedFrequency(frequency);
         client.SetFrequency(frequency);
@@ -365,6 +396,12 @@ public partial class Form1 : Form
     private void SelectBand()
     {
         if (selectingDetectedBand) return;
+        if (client.IsOpenWebRx && bandBox.SelectedItem is OpenWebRxProfile profile) {
+            waterfall.ClearHistory(); Interlocked.Exchange(ref pendingWaterfallLine,null);
+            statusLabel.Text="Switching OpenWebRX profile: " + profile.Name;
+            client.SelectProfile(profile.Id);
+            return;
+        }
         if (bandBox.SelectedItem is not BandPreset band) return;
         frequencyBox.Text = band.FrequencyMHz.ToString("0.000000", CultureInfo.InvariantCulture);
         modeBox.SelectedItem = band.Mode;
@@ -375,7 +412,7 @@ public partial class Form1 : Form
         client.SetFrequency(frequency);
         client.SetMode(band.Mode);
         client.SetBandwidth(band.Bandwidth);
-        client.SetWaterfallView(band.Zoom, frequency);
+        if(client.HasNativeSpectrum)client.SetSpectrumView(waterfall.CenterFrequency,waterfall.VisibleSpan);else client.SetWaterfallView(band.Zoom, frequency);
         webReceiver?.SetFrequency(frequency);
         webReceiver?.SetMode(band.Mode);
         webReceiver?.SetBandwidth(band.Bandwidth);
@@ -416,16 +453,19 @@ public partial class Form1 : Form
         finally { connectionGate.Release(); }
     }
 
-    private async Task ToggleConnectionCore()
+    private async Task ToggleConnectionCore(string? selectedReceiverUrl = null, string? selectedProtocol = null)
     {
+        // Freeze the destination before any await or focus/dropdown event can change the field.
+        var receiverUrl = NormalizeServerUrl(selectedReceiverUrl ?? urlBox.Text);
+        var protocol = ReceiverProtocols.Normalize(selectedProtocol ?? protocolBox.Text);
         if (webReceiver is not null)
         {
-            if (NormalizeServerUrl(urlBox.Text).Equals(currentServerUrl, StringComparison.OrdinalIgnoreCase)) { DeactivateWebReceiver(); return; }
+            if (receiverUrl.Equals(currentServerUrl, StringComparison.OrdinalIgnoreCase)) { DeactivateWebReceiver(); return; }
             DeactivateWebReceiver();
         }
-        if (client.IsConnected)
+        if (client.IsConnected || client.HasNativeSpectrum)
         {
-            var sameReceiver = NormalizeServerUrl(urlBox.Text).Equals(currentServerUrl, StringComparison.OrdinalIgnoreCase);
+            var sameReceiver = client.IsConnected && receiverUrl.Equals(currentServerUrl, StringComparison.OrdinalIgnoreCase);
             await CancelWaterfallRecordingAsync(); await client.DisconnectAsync(); connectButton.Text = "Connect"; ResetAudioButton();
             if (sameReceiver) return;
         }
@@ -436,12 +476,20 @@ public partial class Form1 : Form
         try
         {
             var frequency = mhz * 1_000_000;
-            var receiverUrl = NormalizeServerUrl(urlBox.Text);
-            if (receiverUrl.Length == 0) throw new InvalidOperationException("Enter a valid HTTP/HTTPS receiver URL.");
-            var protocol = ReceiverProtocols.Normalize(protocolBox.Text);
+            if (receiverUrl.Length == 0) throw new InvalidOperationException("Enter a valid HTTP/HTTPS or sdr://host:port receiver URL.");
+            if (SpyServerAddress.TryParse(receiverUrl, out _)) protocol = "SpyServer";
             if (protocol == "Auto") protocol = ReceiverProtocols.Normalize(LoadFavorites().FirstOrDefault(f => NormalizeServerUrl(f.Url) == receiverUrl)?.Protocol);
             if (protocol == "Auto") protocol = IsTwenteWebSdr(receiverUrl) ? "WebSDR" : await ReceiverProtocols.DetectAsync(receiverUrl);
-            if (protocol is "OpenWebRX" or "WebSDR")
+            if(protocol != "OpenWebRX" && bandBox.Items.Cast<object>().Any(item=>item is OpenWebRxProfile)){
+                selectingDetectedBand=true;
+                try { bandBox.Items.Clear();bandBox.Items.AddRange(Bands.Cast<object>().ToArray()); }
+                finally { selectingDetectedBand=false; }
+            }
+            if(protocol is "OpenWebRX" or "SpyServer"){
+                if(!new[]{"AM","USB","LSB","CW","NFM"}.Contains(modeBox.Text))modeBox.SelectedItem="AM";
+                modeBox.Items.Remove("IQ");
+            }else if(!modeBox.Items.Contains("IQ"))modeBox.Items.Add("IQ");
+            if (protocol == "WebSDR")
             {
                 ShowConnectionProgress(35, "Loading receiver waterfall...");
                 await ActivateWebReceiverAsync(receiverUrl, protocol, frequency);
@@ -452,13 +500,18 @@ public partial class Form1 : Form
                 else statusLabel.Text = "Receiver still loading. Check the receiver panel for a profile or error.";
                 return;
             }
-            currentServerUrl = NormalizeServerUrl(urlBox.Text);
+            waterfall.ClearHistory(); Interlocked.Exchange(ref pendingWaterfallLine,null);
+            currentServerUrl = receiverUrl;
+            clocks.ReceiverZone=null; clocks.SetReceiverTime(null);
+            currentServerTitle=protocol;
             currentServerAntenna = "Not reported";
             ShowConnectionProgress(25, "Opening receiver channels...");
-            await client.ConnectAsync(urlBox.Text, frequency, modeBox.Text.ToLowerInvariant(), (int)bandwidthBox.Value);
+            if(protocol == "SpyServer") await client.ConnectSpyServerAsync(receiverUrl,frequency,modeBox.Text.ToLowerInvariant(),(int)bandwidthBox.Value);
+            else if(protocol == "OpenWebRX") await client.ConnectOpenWebRxAsync(receiverUrl,frequency,modeBox.Text.ToLowerInvariant(),(int)bandwidthBox.Value);
+            else { waterfall.SetFrequencyLimit(30_000_000); await client.ConnectAsync(receiverUrl, frequency, modeBox.Text.ToLowerInvariant(), (int)bandwidthBox.Value); }
             ShowConnectionProgress(85, "Starting audio...");
-            PreselectBandForFrequency(frequency);
-            waterfall.SetRadioState(frequency, 30_000_000d / (1 << 11), frequency, (int)bandwidthBox.Value);
+            if(!client.HasNativeSpectrum){PreselectBandForFrequency(frequency);
+            waterfall.SetRadioState(frequency, 30_000_000d / (1 << 11), frequency, (int)bandwidthBox.Value);}
             ApplyWaterfallRange();
             StartReceiverAudio();
             connectButton.Text = "Disconnect";
@@ -505,7 +558,7 @@ public partial class Form1 : Form
         connectButton.Text = "Disconnect";
         recordButton.Enabled = false;
         recordWaterfallCheckBox.Enabled = false;
-        bandBox.Enabled = false;
+        bandBox.Enabled = protocol == "WebSDR";
         wfMinBox.Enabled = wfMaxBox.Enabled = false;
         zoomBar.Enabled = false;
         serverInfoBox.Text = currentServerTitle + "\n" + receiverUrl + "\nSelect bands/profiles and advanced modes in the receiver panel.\nNative recording is unavailable for web receivers.";
@@ -745,6 +798,8 @@ public partial class Form1 : Form
         waterfall.SetTunedFrequency(frequency);
     }
 
+    private readonly ToolStripMenuItem openWebRxProfiles = new("OpenWebRX profiles");
+
     private void OpenReceiverMap()
     {
         var map = new ReceiverMapForm();
@@ -761,6 +816,8 @@ public partial class Form1 : Form
         var menu = new MenuStrip { BackColor = Color.FromArgb(45, 52, 58), ForeColor = Color.White };
         var file = new ToolStripMenuItem("Receiver");
         file.DropDownItems.Add("Startup preferences...", null, (_, _) => OpenStartupSettings());
+        file.DropDownItems.Add(openWebRxProfiles);
+        file.DropDownOpening+=(_,_)=>openWebRxProfiles.Enabled=client.IsOpenWebRx;
         var protocols = new ToolStripMenuItem("Protocol");
         foreach (var name in ReceiverProtocols.Names) { var item = new ToolStripMenuItem(name) { Checked = name == "Auto" }; item.Click += (_, _) => { protocolBox.SelectedItem = name; foreach (ToolStripMenuItem other in protocols.DropDownItems) other.Checked = other == item; }; protocols.DropDownItems.Add(item); }
         protocols.DropDownOpening += (_, _) => { foreach (ToolStripMenuItem item in protocols.DropDownItems) item.Checked = item.Text == protocolBox.Text; };
@@ -949,14 +1006,16 @@ public partial class Form1 : Form
 
     private static string NormalizeServerUrl(string value)
     {
+        value = value.Split(" | ", 2, StringSplitOptions.None)[0];
         if (string.IsNullOrWhiteSpace(value)) return "";
+        if (SpyServerAddress.TryParse(value.Trim(), out var spyAddress)) return spyAddress.Url;
         var candidate = value.Contains("://", StringComparison.Ordinal) ? value.Trim() : "http://" + value.Trim();
         return Uri.TryCreate(candidate, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https" && uri.UserInfo.Length == 0 ? uri.ToString().TrimEnd('/') : "";
     }
 
     private void ToggleCurrentServerFavorite()
     {
-        if (!Uri.TryCreate(urlBox.Text.Trim(), UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https"))
+        if (!Uri.TryCreate(NormalizeServerUrl(urlBox.Text), UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https" or "sdr"))
         {
             MessageBox.Show(this, "Enter a valid receiver URL first.", "Favorites", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
@@ -979,7 +1038,7 @@ public partial class Form1 : Form
         var serverDetailsMatch = currentServerUrl.Equals(url, StringComparison.OrdinalIgnoreCase);
         var title = serverDetailsMatch && currentServerTitle != "KiwiSDR" ? currentServerTitle : uri.Host;
         var location = serverDetailsMatch ? currentServerLocation : "Location not reported";
-        favorites.Add(new FavoriteServer(title, location, url) { Protocol = ReceiverProtocols.Normalize(protocolBox.Text) });
+        favorites.Add(new FavoriteServer(title, location, url) { Antenna = serverDetailsMatch ? currentServerAntenna : "Antenna not reported", Protocol = uri.Scheme == "sdr" ? "SpyServer" : ReceiverProtocols.Normalize(protocolBox.Text) });
         if (SaveFavorites(favorites))
         {
             RefreshFavoritesMenu();
@@ -1008,7 +1067,7 @@ public partial class Form1 : Form
         var typedUrl = urlBox.Text;
         urlBox.Items.Clear();
         urlBox.Items.AddRange(favorites.Cast<object>().ToArray());
-        urlBox.Text = typedUrl;
+        urlBox.Text = favorites.FirstOrDefault(f => NormalizeServerUrl(f.Url) == NormalizeServerUrl(typedUrl))?.DisplayText ?? NormalizeServerUrl(typedUrl);
         if (favorites.Count == 0)
         {
             favoritesMenu.DropDownItems.Add(new ToolStripMenuItem("No favorites yet") { Enabled = false });
@@ -1032,7 +1091,7 @@ public partial class Form1 : Form
 
     private void UpdateFavoriteButton()
     {
-        var normalizedUrl = Uri.TryCreate(urlBox.Text.Trim(), UriKind.Absolute, out var uri) ? uri.ToString().TrimEnd('/') : "";
+        var normalizedUrl = Uri.TryCreate(NormalizeServerUrl(urlBox.Text), UriKind.Absolute, out var uri) ? uri.ToString().TrimEnd('/') : "";
         var isFavorite = normalizedUrl.Length > 0 && LoadFavorites().Any(item => item.Url.Equals(normalizedUrl, StringComparison.OrdinalIgnoreCase));
         favoriteButton.Text = ""; favoriteButton.Active = isFavorite; favoriteButton.Invalidate();
         favoriteButton.BackColor = Color.FromArgb(35, 42, 48);
@@ -1050,6 +1109,8 @@ public partial class Form1 : Form
 
     private async Task SwitchReceiverAsync(string serverUrl, string protocol = "Auto", double? requestedFrequency = null, string? requestedMode = null)
     {
+        var targetUrl = NormalizeServerUrl(serverUrl);
+        if (targetUrl.Length == 0) throw new ArgumentException("Invalid receiver URL.", nameof(serverUrl));
         await connectionGate.WaitAsync();
         try
         {
@@ -1060,7 +1121,8 @@ public partial class Form1 : Form
             await CancelWaterfallRecordingAsync();
             DeactivateWebReceiver();
             await client.DisconnectAsync();
-            urlBox.Text = serverUrl.Trim().TrimEnd('/');
+            urlBox.SelectedIndex = -1;
+            urlBox.Text = LoadFavorites().FirstOrDefault(f => NormalizeServerUrl(f.Url) == targetUrl)?.DisplayText ?? targetUrl;
             protocolBox.SelectedItem = ReceiverProtocols.Normalize(protocol);
             if (requestedFrequency.HasValue) frequencyBox.Text = (requestedFrequency.Value / 1_000_000).ToString("0.000000", CultureInfo.InvariantCulture);
             if (requestedMode is not null)
@@ -1071,15 +1133,18 @@ public partial class Form1 : Form
                 finally { syncingWebState = false; }
             }
             connectButton.Text = "Connect";
-            await ToggleConnectionCore();
+            await ToggleConnectionCore(targetUrl, protocol);
         }
         finally
         {
             connectButton.Enabled = true;
+            HideConnectionProgress();
             connectionGate.Release();
         }
     }
 
-    private void SendMode() { if (syncingWebState) return; client.SetMode(modeBox.Text.ToLowerInvariant()); webReceiver?.SetMode(modeBox.Text); }
+    private void SendMode() { if (syncingWebState) return;
+        if (client.IsSpyServer) bandwidthBox.Value = modeBox.Text switch { "AM" => 6000, "NFM" => 12000, "CW" => 500, _ => 2400 };
+        client.SetMode(modeBox.Text.ToLowerInvariant()); webReceiver?.SetMode(modeBox.Text); }
     private void SendBandwidth() { if (syncingWebState) return; waterfall.SetPassbandWidth((int)bandwidthBox.Value); client.SetBandwidth((int)bandwidthBox.Value); webReceiver?.SetBandwidth((int)bandwidthBox.Value); }
 }

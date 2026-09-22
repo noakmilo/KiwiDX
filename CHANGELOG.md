@@ -1,4 +1,34 @@
+## v0.2.1 - 2026-09-13
+
+- Edit favorite Name and Description while keeping URL and Antenna read-only; preserve custom descriptions when receiver metadata refreshes.
+
+- Honor Airspy directory registered/reachability status: green ready receivers, red offline/unreachable, orange busy and gray unverified; add a legend and available-only map/list filter.
+
+- Route SpyServer diagnostics to Console Log, including TCP/handshake stages, capabilities, settings, first IQ/FFT, periodic rates and precise timeout causes. Give TCP, negotiation and streaming separate connection budgets.
+
+- Add native Airspy SpyServer TCP reception with reduced IQ + FFT, native spectrum/waterfall, AM/USB/LSB/NFM/CW demodulation, tuning, audio and recording.
+- Add the live Airspy directory as a third receiver map, with bundled vector cartography, searchable receiver metadata and direct sdr:// connections.
+- Preserve SpyServer favorites and RX links; validate network packets, bound processing buffers and handle disconnect/reconnect cleanly.
+
+- For Twente only, scroll to the bottom edge of the waterfall and lock vertical scrolling with the scrollbar hidden.
+
+- Populate the native Band selector with the active OpenWebRX server profiles; selecting a band changes the server profile and clears the previous waterfall history. Restore standard bands for KiwiSDR.
+
+- Receive OpenWebRX audio and spectrum directly without WebView; add native profile selection, tuning, waterfall navigation and recording.
+- Decode PCM/float spectra and IMA ADPCM streams; preserve the selected receiver protocol in RX sharing.
+
+- Keep the original WebSDR/Twente page layout; automatically enable Full window width and sticky when connecting.
+- Remove experimental WebSDR page cropping, forced scrolling and canvas resizing. OpenWebRX retains its existing compact view.
+
 ## v0.2.0 - 2026-09-11
+
+- Preserve the explicitly selected map/favorite receiver URL throughout asynchronous disconnect, detection and connection.
+
+- Switch between KiwiSDR and Receiverbook maps with a floating button; connect receiver marker links directly and hide Receiverbook navigation/footer.
+
+- Enable Full window width and sticky automatically when a WebSDR receiver initializes, including Twente.
+
+- Label bands as ham radio or broadcast; show favorite URLs with location and antenna in the editable receiver dropdown.
 
 - Keep bounded console history in memory and update the native log control only when visible; truncate oversized diagnostics.
 - Show a centered animated connection indicator with stage percentages.

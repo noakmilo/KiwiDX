@@ -21,7 +21,7 @@ internal sealed class FavoriteServerBox : RadioComboBox
 
 internal static class ReceiverProtocols
 {
-    internal static readonly string[] Names = { "Auto", "KiwiSDR", "OpenWebRX", "WebSDR" };
+    internal static readonly string[] Names = { "Auto", "KiwiSDR", "OpenWebRX", "WebSDR", "SpyServer" };
     internal static string Normalize(string? value) => Names.FirstOrDefault(n => n.Equals(value, StringComparison.OrdinalIgnoreCase)) ?? "Auto";
     internal static string DetectHtml(string html)
     {
@@ -34,6 +34,7 @@ internal static class ReceiverProtocols
     }
     internal static async Task<string> DetectAsync(string url)
     {
+        if (SpyServerAddress.TryParse(url, out _)) return "SpyServer";
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(8), MaxResponseContentBufferSize = 2_000_000 };
         try { return DetectHtml(await http.GetStringAsync(url)); }
         catch (HttpRequestException) { return "KiwiSDR"; }

@@ -1,4 +1,4 @@
-KiwiDX v0.2.0 - Runtime Requirements
+KiwiDX v0.2.1 - Runtime Requirements
 =====================================
 
 Operating system
@@ -26,10 +26,10 @@ Hardware and connectivity
 
 Files that must be distributed together
 ---------------------------------------
-- KiwiDX_v0.2.0.exe
-- KiwiDX_v0.2.0.dll
-- KiwiDX_v0.2.0.deps.json
-- KiwiDX_v0.2.0.runtimeconfig.json
+- KiwiDX_v0.2.1.exe
+- KiwiDX_v0.2.1.dll
+- KiwiDX_v0.2.1.deps.json
+- KiwiDX_v0.2.1.runtimeconfig.json
 - Microsoft.Web.WebView2.Core.dll
 - Microsoft.Web.WebView2.WinForms.dll
 - The complete runtimes folder generated in Release.
@@ -43,14 +43,21 @@ Files that must be distributed together
 
 Optional file
 -------------
-- KiwiDX_v0.2.0.pdb is only needed for debugging and crash diagnostics.
+- KiwiDX_v0.2.1.pdb is only needed for debugging and crash diagnostics.
 
 Installation
 ------------
-1. Run KiwiDX_v0.2.0_Setup_x64.exe, or extract the entire release ZIP.
-2. The installed and published application is KiwiDX.exe; source builds use KiwiDX_v0.2.0.exe.
+1. Run KiwiDX_v0.2.1_Setup_x64.exe, or extract the entire release ZIP.
+2. The installed and published application is KiwiDX.exe; source builds use KiwiDX_v0.2.1.exe.
 3. Install future Setup versions over the existing installation.
 4. User preferences are stored in %LOCALAPPDATA%\KiwiDX and retained on upgrade/uninstall.
 5. On first launch, select the old portable folder when prompted to migrate its settings.
 
 No separate NAudio installation is required. Its libraries are included with KiwiDX.
+
+Airspy SpyServer support
+-----------------------
+- Outbound TCP access to the selected SpyServer port (normally 5555). No Airspy USB driver is needed.
+- The Airspy directory uses HTTPS to airspy.com.
+- Bundled Leaflet 1.9.4 map assets use the BSD 2-Clause license; see design/maps/Leaflet-LICENSE.txt.
+- Bundled Natural Earth country outlines are public domain; see design/maps/README.md.
